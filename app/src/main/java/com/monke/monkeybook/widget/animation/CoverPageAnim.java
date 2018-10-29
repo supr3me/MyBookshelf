@@ -1,13 +1,12 @@
 package com.monke.monkeybook.widget.animation;
 
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 
 /**
- * Created by newbiechen on 17-7-24.
+ * 覆盖翻页
  */
 
 public class CoverPageAnim extends HorizonPageAnim {
@@ -23,16 +22,6 @@ public class CoverPageAnim extends HorizonPageAnim {
         mBackShadowDrawableLR = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT, mBackShadowColors);
         mBackShadowDrawableLR.setGradientType(GradientDrawable.LINEAR_GRADIENT);
-    }
-
-    @Override
-    public void drawStatic(Canvas canvas) {
-        if (isCancel) {
-            mNextBitmap = mCurBitmap.copy(Bitmap.Config.RGB_565, true);
-            canvas.drawBitmap(mCurBitmap, 0, 0, null);
-        } else {
-            canvas.drawBitmap(mNextBitmap, 0, 0, null);
-        }
     }
 
     @Override
@@ -60,7 +49,7 @@ public class CoverPageAnim extends HorizonPageAnim {
                 mSrcRect.left = mViewWidth - dis;
                 mDestRect.right = dis;
                 canvas.drawBitmap(mCurBitmap, 0, 0, null);
-                canvas.drawBitmap(mNextBitmap, mSrcRect, mDestRect, null);
+                canvas.drawBitmap(mPreBitmap, mSrcRect, mDestRect, null);
                 addShadow(dis, canvas);
                 break;
         }

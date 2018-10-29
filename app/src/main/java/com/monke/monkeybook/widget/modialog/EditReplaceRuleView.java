@@ -2,13 +2,15 @@ package com.monke.monkeybook.widget.modialog;
 
 import android.app.Activity;
 import android.content.Context;
-import android.support.design.widget.TextInputEditText;
 import android.support.design.widget.TextInputLayout;
+import android.support.v7.widget.AppCompatEditText;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.CheckBox;
 
 import com.monke.monkeybook.R;
 import com.monke.monkeybook.bean.ReplaceRuleBean;
+import com.monke.monkeybook.utils.SharedPreferencesUtil;
 import com.monke.monkeybook.utils.barUtil.ImmersionBar;
 
 /**
@@ -17,10 +19,11 @@ import com.monke.monkeybook.utils.barUtil.ImmersionBar;
  */
 
 public class EditReplaceRuleView {
-    private TextInputEditText tieReplaceSummary;
-    private TextInputEditText tieReplaceRule;
-    private TextInputEditText tieReplaceTo;
-    private TextInputEditText tieUseTo;
+    private AppCompatEditText tieReplaceSummary;
+    private AppCompatEditText tieReplaceRule;
+    private AppCompatEditText tieReplaceTo;
+    private AppCompatEditText tieUseTo;
+    private CheckBox cbUseRegex;
 
     private MoProgressHUD moProgressHUD;
     private MoProgressView moProgressView;
@@ -48,9 +51,11 @@ public class EditReplaceRuleView {
             tieReplaceTo.setText(replaceRuleBean.getReplacement());
             tieReplaceRule.setText(replaceRuleBean.getRegex());
             tieUseTo.setText(replaceRuleBean.getUseTo());
+            cbUseRegex.setChecked(replaceRuleBean.getIsRegex());
         } else {
             this.replaceRuleBean = new ReplaceRuleBean();
             this.replaceRuleBean.setEnable(true);
+            cbUseRegex.setChecked(SharedPreferencesUtil.getBoolean("useRegexInNewRule", false));
         }
     }
 
@@ -73,11 +78,13 @@ public class EditReplaceRuleView {
         tieReplaceSummary = moProgressView.findViewById(R.id.tie_replace_summary);
         tieReplaceTo = moProgressView.findViewById(R.id.tie_replace_to);
         tieUseTo = moProgressView.findViewById(R.id.tie_use_to);
+        cbUseRegex = moProgressView.findViewById(R.id.cb_use_regex);
 
         View tvOk = moProgressView.findViewById(R.id.tv_ok);
         tvOk.setOnClickListener(view -> {
             replaceRuleBean.setReplaceSummary(tieReplaceSummary.getText().toString());
             replaceRuleBean.setRegex(tieReplaceRule.getText().toString());
+            replaceRuleBean.setIsRegex(cbUseRegex.isChecked());
             replaceRuleBean.setReplacement(tieReplaceTo.getText().toString());
             replaceRuleBean.setUseTo(tieUseTo.getText().toString());
             saveReplaceRule.saveReplaceRule(replaceRuleBean);

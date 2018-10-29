@@ -15,6 +15,8 @@ import com.monke.monkeybook.help.ReadBookControl;
  */
 
 public abstract class PageAnimation {
+    //动画速度
+    static final int animationSpeed = 300;
     //正在使用的View
     protected View mView;
     protected ReadBookControl readBookControl = ReadBookControl.getInstance();
@@ -25,7 +27,6 @@ public abstract class PageAnimation {
     //移动方向
     protected Direction mDirection = Direction.NONE;
 
-    protected boolean isRunning = false;
     //屏幕的尺寸
     protected int mScreenWidth;
     protected int mScreenHeight;
@@ -45,7 +46,9 @@ public abstract class PageAnimation {
     //上一个触碰点
     protected float mLastX;
     protected float mLastY;
-    private boolean startAnim = false;
+
+    protected boolean isRunning = false;
+    protected boolean changePage = false;
 
     public PageAnimation(int w, int h, View view, OnPageChangeListener listener) {
         this(w, h, 0, 0, 0, view, listener);
@@ -92,19 +95,14 @@ public abstract class PageAnimation {
         return isRunning;
     }
 
-    public boolean isStartAnim() {
-        return startAnim;
-    }
-
-    public void setStartAnim(boolean startAnim) {
-        this.startAnim = startAnim;
+    public boolean isChangePage() {
+        return changePage;
     }
 
     /**
      * 开启翻页动画
      */
     public void startAnim() {
-        startAnim = true;
         isRunning = true;
         mView.postInvalidate();
     }
@@ -124,7 +122,7 @@ public abstract class PageAnimation {
     /**
      * 点击事件的处理
      */
-    public abstract boolean onTouchEvent(MotionEvent event);
+    public abstract void onTouchEvent(MotionEvent event);
 
     /**
      * 绘制图形
@@ -135,22 +133,38 @@ public abstract class PageAnimation {
      * 滚动动画
      * 必须放在computeScroll()方法中执行
      */
-    public abstract void scrollAnim();
+    public void scrollAnim() {
+        if (mScroller.computeScrollOffset()) {
+            int x = mScroller.getCurrX();
+            int y = mScroller.getCurrY();
+
+            setTouchPoint(x, y);
+
+            if (mScroller.getFinalX() == x && mScroller.getFinalY() == y) {
+                isRunning = false;
+            }
+            mView.postInvalidate();
+        }
+    }
 
     /**
      * 取消动画
      */
     public abstract void abortAnim();
 
+    public abstract void changePageEnd();
+
     /**
      * 获取背景板
+     * pageOnCur: 位于当前页的位置, 小于0上一页, 0 当前页, 大于0下一页
      */
-    public abstract Bitmap getBgBitmap();
+    public abstract Bitmap getBgBitmap(int pageOnCur);
 
     /**
      * 获取内容显示版面
+     * pageOnCur: 位于当前页的位置, 小于0上一页, 0 当前页, 大于0下一页
      */
-    public abstract Bitmap getNextBitmap();
+    public abstract Bitmap getContentBitmap(int pageOnCur);
 
     public enum Direction {
         NONE(true), NEXT(true), PRE(true), UP(false), DOWN(false);
@@ -163,15 +177,15 @@ public abstract class PageAnimation {
     }
 
     public interface OnPageChangeListener {
+        void changePage(Direction direction);
+
         boolean hasPrev();
 
-        boolean hasNext();
+        boolean hasNext(int pageOnCur);
 
-        void pageCancel();
+        void drawBackground(int pos);
 
-        void nextPage();
-
-        void prevPage();
+        void drawContent(int pos);
     }
 
 }

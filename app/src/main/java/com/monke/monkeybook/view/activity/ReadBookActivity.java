@@ -53,6 +53,8 @@ import com.monke.monkeybook.view.popupwindow.ReadInterfacePop;
 import com.monke.monkeybook.widget.ChapterListView;
 import com.monke.monkeybook.widget.modialog.EditBookmarkView;
 import com.monke.monkeybook.widget.modialog.MoProgressHUD;
+import com.monke.monkeybook.widget.page.Enum;
+import com.monke.monkeybook.widget.page.NetPageLoader;
 import com.monke.monkeybook.widget.page.PageLoader;
 import com.monke.monkeybook.widget.page.PageView;
 import com.monke.mprogressbar.MHorProgressBar;
@@ -431,7 +433,7 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
         initReadInterfacePop();
         initReadAdjustPop();
         initMoreSettingPop();
-        flContent.setBackground(readBookControl.getTextBackground());
+        pageView.setBackground(readBookControl.getTextBackground());
     }
 
     /**
@@ -520,6 +522,13 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
                 moreSettingPop.dismiss();
                 ReadBookActivity.this.recreate();
             }
+
+            @Override
+            public void refreshPage() {
+                if (mPageLoader != null) {
+                    mPageLoader.refreshUi();
+                }
+            }
         });
     }
 
@@ -532,7 +541,6 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
      * 加载阅读页面
      */
     private void initPageView() {
-        //获取页面加载器
         mPageLoader = pageView.getPageLoader(this, mPresenter.getBookShelf());
         mPageLoader.updateBattery(BatteryUtil.getLevel(this));
         mPageLoader.setOnPageChangeListener(
@@ -565,12 +573,6 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
                     }
 
                     @Override
-                    public void requestChapters(int chapterIndex) {
-                        if (isNetWorkAvailable())
-                            mPresenter.loadContent(chapterIndex);
-                    }
-
-                    @Override
                     public void onCategoryFinish(List<ChapterListBean> chapters) {
                         mPresenter.getBookShelf().getBookInfoBean().setChapterList(chapters);
                         mPresenter.getBookShelf().setChapterListSize(chapters.size());
@@ -583,8 +585,8 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
                         hpbReadProgress.setMaxProgress(Math.max(0, count - 1));
                         hpbReadProgress.setDurProgress(0);
                         // 如果处于错误状态，那么就冻结使用
-                        if (mPageLoader.getPageStatus() == PageLoader.STATUS_LOADING
-                                || mPageLoader.getPageStatus() == PageLoader.STATUS_ERROR) {
+                        if (mPageLoader.getPageStatus() == Enum.PageStatus.LOADING
+                                || mPageLoader.getPageStatus() == Enum.PageStatus.ERROR) {
                             hpbReadProgress.setEnabled(false);
                         } else {
                             hpbReadProgress.setEnabled(true);
@@ -852,7 +854,7 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
             case R.id.action_copy_text:
                 popMenuOut();
                 if (mPageLoader != null) {
-                    moProgressHUD.showText(mPageLoader.getContent(mPageLoader.getPagePos()));
+                    moProgressHUD.showText(mPageLoader.getContent(mPageLoader.getCurPagePos()));
                 }
                 break;
             case R.id.disable_book_source:
@@ -930,7 +932,7 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
         if (mPresenter.getBookShelf() != null) {
             moProgressHUD.showChangeSource(this, mPresenter.getBookShelf(), searchBookBean -> {
                 if (!Objects.equals(searchBookBean.getNoteUrl(), mPresenter.getBookShelf().getNoteUrl())) {
-                    mPageLoader.setStatus(PageLoader.STATUS_HY);
+                    mPageLoader.setStatus(Enum.PageStatus.CHANGE_SOURCE);
                     mPresenter.changeBookSource(searchBookBean);
                 }
             });
@@ -1177,18 +1179,6 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
     }
 
     @Override
-    public void finishContent() {
-        if (mPageLoader != null && mPageLoader.getPageStatus() != PageLoader.STATUS_FINISH) {
-            mPageLoader.openChapter(mPresenter.getBookShelf().getDurChapterPage());
-        }
-    }
-
-    @Override
-    public void error(String msg) {
-
-    }
-
-    @Override
     public void openBookFromOther() {
         if (EasyPermissions.hasPermissions(this, MApplication.PerList)) {
             mPresenter.openBookFromOther(this);
@@ -1228,9 +1218,9 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
             default:
                 ReadBookActivity.this.popMenuOut();
                 if (mPresenter.getBookShelf() != null && mPageLoader != null) {
-                    ReadAloudService.play(this, true, mPageLoader.getContent(mPageLoader.getPagePos()),
+                    ReadAloudService.play(this, true, mPageLoader.getContent(mPageLoader.getCurPagePos()),
                             mPresenter.getBookShelf().getBookInfoBean().getName(),
-                            ChapterContentHelp.replaceContent(mPresenter.getBookShelf(), mPresenter.getChapterTitle(mPageLoader.getChapterPos()))
+                            ChapterContentHelp.replaceContent(mPresenter.getBookShelf(), mPresenter.getChapterTitle(mPageLoader.getCurChapterPos()))
                     );
                 }
         }
@@ -1266,9 +1256,10 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
         batInfoReceiver.registerThis();
         screenOffTimerStart();
         if (mPageLoader != null) {
-            mPageLoader.updateBattery(BatteryUtil.getLevel(this));
+            if (!mPageLoader.updateBattery(BatteryUtil.getLevel(this))) {
+                pageView.invalidate();
+            }
         }
-        pageView.drawCurPage();
         if (showCheckPermission && mPresenter.getOpen_from() == OPEN_FROM_OTHER && EasyPermissions.hasPermissions(this, MApplication.PerList)) {
             showCheckPermission = true;
             mPresenter.openBookFromOther(this);
@@ -1312,9 +1303,9 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
     }
 
     @Override
-    public void changeSourceFinish() {
+    public void changeSourceFinish(BookShelfBean book) {
         if (mPageLoader != null) {
-            mPageLoader.changeSourceFinish(mPresenter.getBookShelf());
+            mPageLoader.changeSourceFinish(book);
         }
     }
 
@@ -1343,11 +1334,11 @@ public class ReadBookActivity extends MBaseActivity<ReadBookContract.Presenter> 
             IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_TIME_TICK);
             filter.addAction(Intent.ACTION_BATTERY_CHANGED);
-            LocalBroadcastManager.getInstance(ReadBookActivity.this).registerReceiver(batInfoReceiver, filter);
+            ReadBookActivity.this.registerReceiver(batInfoReceiver, filter);
         }
 
         public void unregisterThis() {
-            LocalBroadcastManager.getInstance(ReadBookActivity.this).unregisterReceiver(batInfoReceiver);
+            ReadBookActivity.this.unregisterReceiver(batInfoReceiver);
             batInfoReceiver = null;
         }
     }

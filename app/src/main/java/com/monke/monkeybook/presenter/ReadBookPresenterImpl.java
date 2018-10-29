@@ -1,14 +1,12 @@
 //Copyright (c) 2017. 章钦豪. All rights reserved.
 package com.monke.monkeybook.presenter;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
@@ -24,7 +22,6 @@ import com.monke.basemvplib.impl.IView;
 import com.monke.monkeybook.BitIntentDataManager;
 import com.monke.monkeybook.R;
 import com.monke.monkeybook.base.observer.SimpleObserver;
-import com.monke.monkeybook.bean.BookContentBean;
 import com.monke.monkeybook.bean.BookShelfBean;
 import com.monke.monkeybook.bean.BookSourceBean;
 import com.monke.monkeybook.bean.BookmarkBean;
@@ -36,7 +33,6 @@ import com.monke.monkeybook.dao.BookSourceBeanDao;
 import com.monke.monkeybook.dao.DbHelper;
 import com.monke.monkeybook.help.ACache;
 import com.monke.monkeybook.help.BookshelfHelp;
-import com.monke.monkeybook.help.ReadBookControl;
 import com.monke.monkeybook.help.RxBusTag;
 import com.monke.monkeybook.model.BookSourceManage;
 import com.monke.monkeybook.model.ImportBookModelImpl;
@@ -47,17 +43,12 @@ import com.monke.monkeybook.service.DownloadService;
 import com.trello.rxlifecycle2.android.ActivityEvent;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Objects;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableOnSubscribe;
-import io.reactivex.Observer;
-import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
 import static com.monke.monkeybook.widget.modialog.ChangeSourceView.savedSource;
@@ -65,22 +56,9 @@ import static com.monke.monkeybook.widget.modialog.ChangeSourceView.savedSource;
 public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.View> implements ReadBookContract.Presenter {
     public final static int OPEN_FROM_OTHER = 0;
     public final static int OPEN_FROM_APP = 1;
-    private final int ADD = 1;
-    private final int REMOVE = 2;
-    private final int CHECK = 3;
 
-    private ReadBookControl readBookControl = ReadBookControl.getInstance();
     private int open_from;
     private BookShelfBean bookShelf;
-    private ExecutorService executorService;
-    private Scheduler scheduler;
-    private List<String> downloadingChapterList = new ArrayList<>();
-    private Handler handler = new Handler();
-
-    public ReadBookPresenterImpl() {
-        executorService = Executors.newFixedThreadPool(10);
-        scheduler = Schedulers.from(executorService);
-    }
 
     @Override
     public void initData(Activity activity) {
@@ -113,54 +91,6 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
         mView.showMenu();
     }
 
-    @SuppressLint("DefaultLocale")
-    @Override
-    public synchronized void loadContent(final int chapterIndex) {
-        if (null != bookShelf && bookShelf.getChapterListSize() > 0) {
-            Observable.create((ObservableOnSubscribe<Integer>) e -> {
-                if (!BookshelfHelp.isChapterCached(BookshelfHelp.getCachePathName(bookShelf.getBookInfoBean()),
-                        chapterIndex, bookShelf.getChapterList(chapterIndex).getDurChapterName())
-                        && !DownloadingList(CHECK, bookShelf.getChapterList(chapterIndex).getDurChapterUrl())) {
-                    DownloadingList(ADD, bookShelf.getChapterList(chapterIndex).getDurChapterUrl());
-                    e.onNext(chapterIndex);
-                }
-                e.onComplete();
-            })
-                    .flatMap(index -> WebBookModelImpl.getInstance().getBookContent(scheduler, bookShelf.getBookInfoBean().getName(), bookShelf.getChapterList(index).getDurChapterUrl(), index, bookShelf.getTag()))
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .compose(((BaseActivity) mView.getContext()).bindUntilEvent(ActivityEvent.DESTROY))
-                    .subscribe(new Observer<BookContentBean>() {
-                        @Override
-                        public void onSubscribe(Disposable d) {
-                            handler.postDelayed(() -> {
-                                DownloadingList(REMOVE, bookShelf.getChapterList(chapterIndex).getDurChapterUrl());
-                                d.dispose();
-                            }, 30 * 1000);
-                        }
-
-                        @SuppressLint("DefaultLocale")
-                        @Override
-                        public void onNext(BookContentBean bookContentBean) {
-                            DownloadingList(REMOVE, bookContentBean.getDurChapterUrl());
-                            mView.finishContent();
-                        }
-
-                        @Override
-                        public void onError(Throwable e) {
-                            DownloadingList(REMOVE, bookShelf.getChapterList(chapterIndex).getDurChapterUrl());
-                            if (chapterIndex == bookShelf.getDurChapter()) {
-                                mView.error(e.getMessage());
-                            }
-                        }
-
-                        @Override
-                        public void onComplete() {
-
-                        }
-                    });
-        }
-    }
-
     /**
      * 禁用当前书源
      */
@@ -185,21 +115,6 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
             }
         } catch (Exception e) {
             Log.e("MonkBook", e.getLocalizedMessage() + "\n" + e.getMessage());
-        }
-    }
-
-    /**
-     * 编辑下载列表
-     */
-    private synchronized boolean DownloadingList(int editType, String value) {
-        if (editType == ADD) {
-            downloadingChapterList.add(value);
-            return true;
-        } else if (editType == REMOVE) {
-            downloadingChapterList.remove(value);
-            return true;
-        } else {
-            return downloadingChapterList.indexOf(value) != -1;
         }
     }
 
@@ -315,7 +230,7 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
                     @Override
                     public void onError(Throwable e) {
                         mView.toast("换源失败！" + e.getMessage());
-                        mView.finishContent();
+                        mView.changeSourceFinish(null);
                     }
                 });
     }
@@ -369,9 +284,9 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
                         RxBus.get().post(RxBusTag.HAD_REMOVE_BOOK, bookShelf);
                         RxBus.get().post(RxBusTag.HAD_ADD_BOOK, value);
                         bookShelf = value;
-                        mView.changeSourceFinish();
+                        mView.changeSourceFinish(bookShelf);
                         String tag = bookShelf.getTag();
-                        if (tag != My716.TAG) {
+                        if (!Objects.equals(tag, My716.TAG)) {
                             try {
                                 long currentTime = System.currentTimeMillis();
                                 String bookName = bookShelf.getBookInfoBean().getName();
@@ -394,7 +309,7 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
                     public void onError(Throwable e) {
                         e.printStackTrace();
                         mView.toast(e.getMessage());
-                        mView.finishContent();
+                        mView.changeSourceFinish(null);
                     }
                 });
     }
@@ -529,7 +444,6 @@ public class ReadBookPresenterImpl extends BasePresenterImpl<ReadBookContract.Vi
 
     @Override
     public void detachView() {
-        executorService.shutdown();
         RxBus.get().unregister(this);
     }
 

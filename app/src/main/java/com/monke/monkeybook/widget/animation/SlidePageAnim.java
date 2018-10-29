@@ -5,7 +5,7 @@ import android.graphics.Rect;
 import android.view.View;
 
 /**
- * Created by newbiechen on 17-7-24.
+ * 滑动翻页
  */
 
 public class SlidePageAnim extends HorizonPageAnim {
@@ -20,17 +20,8 @@ public class SlidePageAnim extends HorizonPageAnim {
     }
 
     @Override
-    public void drawStatic(Canvas canvas) {
-        if (isCancel) {
-            canvas.drawBitmap(mCurBitmap, 0, 0, null);
-        } else {
-            canvas.drawBitmap(mNextBitmap, 0, 0, null);
-        }
-    }
-
-    @Override
     public void drawMove(Canvas canvas) {
-        int dis = 0;
+        int dis;
         switch (mDirection) {
             case NEXT:
                 //左半边的剩余区域
@@ -65,7 +56,7 @@ public class SlidePageAnim extends HorizonPageAnim {
                 mNextDestRect.left = dis;
 
                 canvas.drawBitmap(mCurBitmap, mNextSrcRect, mNextDestRect, null);
-                canvas.drawBitmap(mNextBitmap, mSrcRect, mDestRect, null);
+                canvas.drawBitmap(mPreBitmap, mSrcRect, mDestRect, null);
                 break;
         }
     }
@@ -73,7 +64,7 @@ public class SlidePageAnim extends HorizonPageAnim {
     @Override
     public void startAnim() {
         super.startAnim();
-        int dx = 0;
+        int dx;
         switch (mDirection) {
             case NEXT:
                 if (isCancel) {

@@ -12,8 +12,6 @@ import android.view.ViewConfiguration;
  */
 
 public abstract class HorizonPageAnim extends PageAnimation {
-    //动画速度
-    protected static final int animationSpeed = 300;
     private static final String TAG = "HorizonPageAnim";
     protected Bitmap mPreBitmap;
     protected Bitmap mCurBitmap;
@@ -32,7 +30,7 @@ public abstract class HorizonPageAnim extends PageAnimation {
     //是否没下一页或者上一页
     private boolean noNext = false;
 
-    public HorizonPageAnim(int w, int h, View view, OnPageChangeListener listener) {
+    HorizonPageAnim(int w, int h, View view, OnPageChangeListener listener) {
         super(w, h, view, listener);
         //创建图片
         mPreBitmap = Bitmap.createBitmap(mViewWidth, mViewHeight, Bitmap.Config.RGB_565);
@@ -43,18 +41,25 @@ public abstract class HorizonPageAnim extends PageAnimation {
     /**
      * 转换页面，在显示下一章的时候，必须首先调用此方法
      */
-    public void changePage() {
-        Bitmap bitmap = mCurBitmap;
-        mCurBitmap = mNextBitmap;
-        mNextBitmap = bitmap;
+    @Override
+    public void changePageEnd() {
+        switch (mDirection) {
+            case NEXT:
+                mPreBitmap = mCurBitmap.copy(Bitmap.Config.RGB_565, true);
+                mCurBitmap = mNextBitmap.copy(Bitmap.Config.RGB_565, true);
+                break;
+            case PRE:
+                mNextBitmap = mCurBitmap.copy(Bitmap.Config.RGB_565, true);
+                mCurBitmap = mPreBitmap.copy(Bitmap.Config.RGB_565, true);
+                break;
+        }
     }
-
-    public abstract void drawStatic(Canvas canvas);
 
     public abstract void drawMove(Canvas canvas);
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public void onTouchEvent(MotionEvent event) {
+        changePage = false;
         final int slop = ViewConfiguration.get(mView.getContext()).getScaledTouchSlop();
         //获取点击位置
         int x = (int) event.getX();
@@ -100,20 +105,20 @@ public abstract class HorizonPageAnim extends PageAnimation {
                             //如果上一页不存在
                             if (!hasPrev) {
                                 noNext = true;
-                                return true;
+                                return;
                             }
                         } else {
                             //进行下一页的配置
                             isNext = true;
                             //判断是否下一页存在
-                            boolean hasNext = mListener.hasNext();
+                            boolean hasNext = mListener.hasNext(0);
                             //如果存在设置动画方向
                             setDirection(Direction.NEXT);
 
                             //如果不存在表示没有下一页了
                             if (!hasNext) {
                                 noNext = true;
-                                return true;
+                                return;
                             }
                         }
                     } else {
@@ -133,26 +138,21 @@ public abstract class HorizonPageAnim extends PageAnimation {
 
                     if (isNext) {
                         //判断是否下一页存在
-                        boolean hasNext = mListener.hasNext();
+                        boolean hasNext = mListener.hasNext(0);
                         //设置动画方向
                         setDirection(Direction.NEXT);
                         if (!hasNext) {
-                            return true;
+                            return;
                         }
                     } else {
                         boolean hasPrev = mListener.hasPrev();
                         setDirection(Direction.PRE);
                         if (!hasPrev) {
-                            return true;
+                            return;
                         }
                     }
                 } else {
                     isCancel = Math.abs(mLastX - mStartX) < slop * 3 || isCancel;
-                }
-
-                // 是否取消翻页
-                if (isCancel) {
-                    mListener.pageCancel();
                 }
 
                 // 开启翻页效果
@@ -163,7 +163,6 @@ public abstract class HorizonPageAnim extends PageAnimation {
                 break;
             case MotionEvent.ACTION_CANCEL:
                 isCancel = true;
-                mListener.pageCancel();
                 // 开启翻页效果
                 if (!noNext) {
                     startAnim();
@@ -171,7 +170,6 @@ public abstract class HorizonPageAnim extends PageAnimation {
                 }
                 break;
         }
-        return true;
     }
 
     @Override
@@ -179,25 +177,22 @@ public abstract class HorizonPageAnim extends PageAnimation {
         if (isRunning) {
             drawMove(canvas);
         } else {
-            if (isCancel) {
-                mNextBitmap = mCurBitmap.copy(Bitmap.Config.RGB_565, true);
+            if (!isCancel) {
+                switch (mDirection) {
+                    case NEXT:
+                        canvas.drawBitmap(mNextBitmap, 0, 0, null);
+                        break;
+                    case PRE:
+                        canvas.drawBitmap(mPreBitmap, 0, 0, null);
+                        break;
+                    default:
+                        canvas.drawBitmap(mCurBitmap, 0, 0, null);
+                        break;
+                }
+                changePage = true;
+            } else {
+                canvas.drawBitmap(mCurBitmap, 0, 0, null);
             }
-            drawStatic(canvas);
-        }
-    }
-
-    @Override
-    public void scrollAnim() {
-        if (mScroller.computeScrollOffset()) {
-            int x = mScroller.getCurrX();
-            int y = mScroller.getCurrY();
-
-            setTouchPoint(x, y);
-
-            if (mScroller.getFinalX() == x && mScroller.getFinalY() == y) {
-                isRunning = false;
-            }
-            mView.postInvalidate();
         }
     }
 
@@ -212,12 +207,22 @@ public abstract class HorizonPageAnim extends PageAnimation {
     }
 
     @Override
-    public Bitmap getBgBitmap() {
-        return mNextBitmap;
+    public Bitmap getBgBitmap(int pageOnCur) {
+        if (pageOnCur < 0) {
+            return mPreBitmap;
+        } else if (pageOnCur > 0) {
+            return mNextBitmap;
+        }
+        return mCurBitmap;
     }
 
     @Override
-    public Bitmap getNextBitmap() {
-        return mNextBitmap;
+    public Bitmap getContentBitmap(int pageOnCur) {
+        if (pageOnCur < 0) {
+            return mPreBitmap;
+        } else if (pageOnCur > 0) {
+            return mNextBitmap;
+        }
+        return mCurBitmap;
     }
 }

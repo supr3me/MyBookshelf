@@ -17,7 +17,6 @@ import com.monke.monkeybook.utils.ScreenUtils;
 import com.monke.monkeybook.utils.barUtil.ImmersionBar;
 import com.monke.monkeybook.view.activity.ReadBookActivity;
 import com.monke.monkeybook.widget.animation.CoverPageAnim;
-import com.monke.monkeybook.widget.animation.HorizonPageAnim;
 import com.monke.monkeybook.widget.animation.NonePageAnim;
 import com.monke.monkeybook.widget.animation.PageAnimation;
 import com.monke.monkeybook.widget.animation.ScrollPageAnim;
@@ -44,8 +43,6 @@ public class PageView extends View {
     private int mStartY = 0;
     private boolean isMove = false;
     private boolean actionFromEdge = false;
-    private int mPageIndex;
-    private int mChapterIndex;
     // 初始化参数
     private ReadBookControl readBookControl = ReadBookControl.getInstance();
     // 是否允许点击
@@ -62,29 +59,30 @@ public class PageView extends View {
     // 动画监听类
     private PageAnimation.OnPageChangeListener mPageAnimListener = new PageAnimation.OnPageChangeListener() {
         @Override
+        public void changePage(PageAnimation.Direction direction) {
+            mPageLoader.pagingEnd(direction);
+        }
+
+        @Override
         public boolean hasPrev() {
             return PageView.this.hasPrevPage();
         }
 
         @Override
-        public boolean hasNext() {
-            return PageView.this.hasNextPage();
+        public boolean hasNext(int pageOnCur) {
+            return PageView.this.hasNextPage(pageOnCur);
         }
 
         @Override
-        public void pageCancel() {
-            PageView.this.pageCancel();
+        public void drawBackground(int pos) {
+            PageView.this.drawBackground(pos);
         }
 
         @Override
-        public void nextPage() {
-            autoNextPage();
+        public void drawContent(int pos) {
+            PageView.this.drawContent(pos);
         }
 
-        @Override
-        public void prevPage() {
-            autoPrevPage();
-        }
     };
 
     public PageView(Context context) {
@@ -113,7 +111,7 @@ public class PageView extends View {
     }
 
     //设置翻页的模式
-    void setPageMode(PageMode pageMode, int marginTop, int marginBottom) {
+    void setPageMode(Enum.PageMode pageMode, int marginTop, int marginBottom) {
         //视图未初始化的时候，禁止调用
         if (mViewWidth == 0 || mViewHeight == 0 || mPageLoader == null) return;
         if (!readBookControl.getHideStatusBar()) {
@@ -149,41 +147,29 @@ public class PageView extends View {
         return statusBarHeight;
     }
 
-    public Bitmap getNextBitmap() {
+    public Bitmap getContentBitmap(int pageOnCur) {
         if (mPageAnim == null) return null;
-        return mPageAnim.getNextBitmap();
+        return mPageAnim.getContentBitmap(pageOnCur);
     }
 
-    public Bitmap getBgBitmap() {
+    public Bitmap getBgBitmap(int pageOnCur) {
         if (mPageAnim == null) return null;
-        return mPageAnim.getBgBitmap();
+        return mPageAnim.getBgBitmap(pageOnCur);
     }
 
-    public boolean autoPrevPage() {
+    public void autoPrevPage() {
         if (mPageAnim instanceof ScrollPageAnim) {
-            if (hasPrevPage()) {
-                resetScroll();
-                drawCurPage();
-                return true;
-            }
-            return false;
+            ((ScrollPageAnim) mPageAnim).startAnim(PageAnimation.Direction.PRE);
         } else {
             startPageAnim(PageAnimation.Direction.PRE);
-            return true;
         }
     }
 
-    public boolean autoNextPage() {
+    public void autoNextPage() {
         if (mPageAnim instanceof ScrollPageAnim) {
-            if (hasNextPage()) {
-                resetScroll();
-                drawCurPage();
-                return true;
-            }
-            return false;
+            ((ScrollPageAnim) mPageAnim).startAnim(PageAnimation.Direction.NEXT);
         } else {
             startPageAnim(PageAnimation.Direction.NEXT);
-            return true;
         }
     }
 
@@ -199,7 +185,7 @@ public class PageView extends View {
             //设置点击点
             mPageAnim.setTouchPoint(x, y);
             //设置方向
-            Boolean hasNext = hasNextPage();
+            Boolean hasNext = hasNextPage(0);
 
             mPageAnim.setDirection(direction);
             if (!hasNext) {
@@ -222,12 +208,50 @@ public class PageView extends View {
         mPageAnim.startAnim();
     }
 
+    public void drawPage(int pageOnCur) {
+        if (!isPrepare) return;
+        if (mPageLoader != null) {
+            mPageLoader.drawPage(getBgBitmap(pageOnCur), getContentBitmap(pageOnCur), pageOnCur);
+        }
+    }
+
+    public void drawBackground(int pageOnCur) {
+        if (!isPrepare) return;
+        if (mPageLoader != null) {
+            mPageLoader.drawPage(getBgBitmap(pageOnCur), null, pageOnCur);
+        }
+    }
+
+    public void drawContent(int pageOnCur) {
+        if (!isPrepare) return;
+        if (mPageLoader != null) {
+            mPageLoader.drawPage(null, getContentBitmap(pageOnCur), pageOnCur);
+        }
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         //绘制动画
         if (mPageAnim != null) {
             mPageAnim.draw(canvas);
         }
+    }
+
+    @Override
+    public void computeScroll() {
+        //进行滑动
+        if (mPageAnim != null) {
+            mPageAnim.scrollAnim();
+            if (mPageAnim.isChangePage() && !mPageAnim.getScroller().computeScrollOffset()) {
+                mPageAnim.changePageEnd();
+                if (mPageAnim.getDirection() != PageAnimation.Direction.NONE) {
+                    mPageLoader.pagingEnd(mPageAnim.getDirection());
+                    mPageAnim.setDirection(PageAnimation.Direction.NONE);
+                }
+            }
+        }
+        super.computeScroll();
+
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -305,7 +329,7 @@ public class PageView extends View {
      * 判断是否存在上一页
      */
     private boolean hasPrevPage() {
-        if (mPageLoader.prev()) {
+        if (mPageLoader.hasPrev()) {
             return true;
         } else {
             activity.showSnackBar(this,"没有上一页");
@@ -316,38 +340,13 @@ public class PageView extends View {
     /**
      * 判断是否下一页存在
      */
-    private boolean hasNextPage() {
-        if (mPageLoader.next()) {
+    private boolean hasNextPage(int pageOnCur) {
+        if (mPageLoader.hasNext(pageOnCur)) {
             return true;
         } else {
             activity.showSnackBar(this, "没有下一页");
             return false;
         }
-    }
-
-    private void pageCancel() {
-        mPageLoader.pageCancel();
-    }
-
-    @Override
-    public void computeScroll() {
-        //进行滑动
-        if (mPageAnim != null) {
-            mPageAnim.scrollAnim();
-            if (mPageAnim.isStartAnim() && !mPageAnim.getScroller().computeScrollOffset()) {
-                mPageAnim.setStartAnim(false);
-                if (mPageLoader.getPagePos() != mPageIndex | mPageLoader.getChapterPos() != mChapterIndex) {
-                    mPageLoader.pagingEnd();
-                }
-            }
-        }
-        super.computeScroll();
-
-    }
-
-    public void upPagePos(int chapterPos, int pagePos) {
-        mChapterIndex = chapterPos;
-        mPageIndex = pagePos;
     }
 
     //如果滑动状态没有停止就取消状态，重新设置Anim的触碰点
@@ -373,29 +372,6 @@ public class PageView extends View {
     public void resetScroll() {
         if (mPageAnim instanceof ScrollPageAnim) {
             ((ScrollPageAnim) mPageAnim).resetBitmap();
-        }
-    }
-
-    /**
-     * 绘制下一页
-     */
-    public void drawNextPage() {
-        if (!isPrepare) return;
-
-        if (mPageAnim instanceof HorizonPageAnim) {
-            ((HorizonPageAnim) mPageAnim).changePage();
-        }
-        mPageLoader.drawPage(getNextBitmap());
-    }
-
-    /**
-     * 绘制当前页。
-     */
-    public void drawCurPage() {
-        if (!isPrepare) return;
-
-        if (mPageLoader != null) {
-            mPageLoader.drawPage(getNextBitmap());
         }
     }
 

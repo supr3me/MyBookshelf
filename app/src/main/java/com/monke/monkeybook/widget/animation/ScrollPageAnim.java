@@ -18,7 +18,6 @@ import java.util.Iterator;
  * Alter by: zeroAngus
  * <p>
  * 问题:
- * 1. 向上翻页，重复的问题 (完成)
  * 2. 滑动卡顿的问题。原因:由于绘制的数据过多造成的卡顿问题。 (主要是文字绘制需要的时长比较多) 解决办法：做文字缓冲
  * 3. 弱网环境下，显示的问题
  */
@@ -26,13 +25,11 @@ public class ScrollPageAnim extends PageAnimation {
     private static final String TAG = "ScrollAnimation";
     // 滑动追踪的时间
     private static final int VELOCITY_DURATION = 1000;
-    BitmapView tmpView;
     private VelocityTracker mVelocity;
     // 整个Bitmap的背景显示
     private Bitmap mBgBitmap;
-    // 下一个展示的图片
-    private Bitmap mNextBitmap;
     // 被废弃的图片列表
+    private Bitmap mNextBitmap;
     private ArrayDeque<BitmapView> mScrapViews;
     // 正在被利用的图片列表
     private ArrayList<BitmapView> mActiveViews = new ArrayList<>(2);
@@ -40,22 +37,20 @@ public class ScrollPageAnim extends PageAnimation {
     private boolean isRefresh = true;
     //是否移动了
     private boolean isMove = false;
-    // 底部填充
-    private Iterator<BitmapView> downIt;
-    private Iterator<BitmapView> upIt;
-    //是否翻阅下一页。true表示翻到下一页，false表示上一页。
-    private boolean isNext = false;
+    private boolean firstDown;
 
     public ScrollPageAnim(int w, int h, int marginWidth, int marginTop, int marginBottom, View view, OnPageChangeListener listener) {
         super(w, h, marginWidth, marginTop, marginBottom, view, listener);
-        // 创建两个BitmapView
         initWidget();
     }
 
+    /**
+     * 创建两个BitmapView
+     */
     private void initWidget() {
         mBgBitmap = Bitmap.createBitmap(mScreenWidth, mScreenHeight, Bitmap.Config.RGB_565);
 
-        mScrapViews = new ArrayDeque<>(2);
+        mScrapViews = new ArrayDeque<>(3);
         for (int i = 0; i < 2; ++i) {
             BitmapView view = new BitmapView();
             view.bitmap = Bitmap.createBitmap(mViewWidth, mViewHeight, Bitmap.Config.ARGB_4444);
@@ -66,11 +61,14 @@ public class ScrollPageAnim extends PageAnimation {
 
             mScrapViews.push(view);
         }
+        firstDown = true;
         onLayout();
         isRefresh = false;
     }
 
-    // 修改布局,填充内容
+    /**
+     * 修改布局,填充内容
+     */
     private void onLayout() {
         // 如果还没有开始加载，则从上到下进行绘制
         if (mActiveViews.size() == 0) {
@@ -78,13 +76,11 @@ public class ScrollPageAnim extends PageAnimation {
             mDirection = Direction.NONE;
         } else {
             int offset = (int) (mTouchY - mLastY);
-            // 判断是下滑还是上拉 (下滑)
-            if (offset > 0) {
+            // 判断是下滑还是上拉
+            if (offset > 0) { //下滑
                 int topEdge = mActiveViews.get(0).top;
                 fillUp(topEdge, offset);
-            }
-            // 上拉
-            else {
+            } else {// 上拉
                 // 底部的距离 = 当前底部的距离 + 滑动的距离 (因为上滑，得到的值肯定是负的)
                 int bottomEdge = mActiveViews.get(mActiveViews.size() - 1).bottom;
                 fillDown(bottomEdge, offset);
@@ -100,7 +96,8 @@ public class ScrollPageAnim extends PageAnimation {
      */
     private void fillDown(int bottomEdge, int offset) {
 
-        downIt = mActiveViews.iterator();
+        // 底部填充
+        Iterator<BitmapView> downIt = mActiveViews.iterator();
         BitmapView view;
 
         // 进行删除
@@ -118,11 +115,6 @@ public class ScrollPageAnim extends PageAnimation {
                 mScrapViews.add(view);
                 // 从Active中移除
                 downIt.remove();
-                // 如果原先是从上加载，现在变成从下加载，则表示取消
-                if (mDirection == Direction.UP) {
-                    mListener.pageCancel();
-                    mDirection = Direction.NONE;
-                }
             }
         }
 
@@ -133,18 +125,27 @@ public class ScrollPageAnim extends PageAnimation {
         while (realEdge < mViewHeight && mActiveViews.size() < 2) {
             // 从废弃的Views中获取一个
             view = mScrapViews.getFirst();
-            //擦除其Bitmap(重新创建会不会更好一点)
-//            eraseBitmap(view.bitmap,view.bitmap.getWidth(),view.bitmap.getHeight(),0,0);
             if (view == null) return;
 
             Bitmap cancelBitmap = mNextBitmap;
             mNextBitmap = view.bitmap;
 
             if (!isRefresh) {
-                boolean hasNext = mListener.hasNext(); //如果不成功则无法滑动
+                boolean hasNext = mListener.hasNext(1); //如果不成功则无法滑动
 
-                // 如果不存在next,则进行还原
-                if (!hasNext) {
+                if (hasNext) {
+                    if (firstDown) {
+                        firstDown = false;
+                        mListener.drawBackground(0);
+                        mListener.drawContent(1);
+                    } else {
+                        mListener.changePage(Direction.NEXT);
+                        mListener.drawBackground(0);
+                        mListener.drawContent(1);
+                    }
+                } else {// 如果不存在next,则进行还原
+                    mListener.changePage(Direction.NEXT);
+                    mListener.drawBackground(0);
                     mNextBitmap = cancelBitmap;
                     for (BitmapView activeView : mActiveViews) {
                         activeView.top = 0;
@@ -183,7 +184,7 @@ public class ScrollPageAnim extends PageAnimation {
      */
     private void fillUp(int topEdge, int offset) {
         // 首先进行布局的调整
-        upIt = mActiveViews.iterator();
+        Iterator<BitmapView> upIt = mActiveViews.iterator();
         BitmapView view;
         while (upIt.hasNext()) {
             view = upIt.next();
@@ -199,13 +200,6 @@ public class ScrollPageAnim extends PageAnimation {
                 mScrapViews.add(view);
                 // 从Active中移除
                 upIt.remove();
-
-                // 如果原先是下，现在变成从上加载了，则表示取消加载
-
-                if (mDirection == Direction.DOWN) {
-                    mListener.pageCancel();
-                    mDirection = Direction.NONE;
-                }
             }
         }
 
@@ -222,9 +216,14 @@ public class ScrollPageAnim extends PageAnimation {
             Bitmap cancelBitmap = mNextBitmap;
             mNextBitmap = view.bitmap;
             if (!isRefresh) {
+                firstDown = false;
                 boolean hasPrev = mListener.hasPrev(); // 如果不成功则无法滑动
-                // 如果不存在next,则进行还原
-                if (!hasPrev) {
+                if (hasPrev) {
+                    mListener.changePage(Direction.PRE);
+                    mListener.drawBackground(0);
+                    mListener.drawContent(0);
+                } else { // 如果不存在next,则进行还原
+                    firstDown = true;
                     mNextBitmap = cancelBitmap;
                     for (BitmapView activeView : mActiveViews) {
                         activeView.top = 0;
@@ -263,12 +262,13 @@ public class ScrollPageAnim extends PageAnimation {
         // 清除所有的Active
         mActiveViews.clear();
         // 重新进行布局
+        firstDown = true;
         onLayout();
         isRefresh = false;
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public void onTouchEvent(MotionEvent event) {
         final int slop = ViewConfiguration.get(mView.getContext()).getScaledTouchSlop();
         int x = (int) event.getX();
         int y = (int) event.getY();
@@ -301,22 +301,19 @@ public class ScrollPageAnim extends PageAnimation {
                 mView.postInvalidate();
                 break;
             case MotionEvent.ACTION_UP:
-                if (!isMove) {
-                    isNext = x > mScreenWidth / 2 || readBookControl.getClickAllNext();
-                    if (isNext) {
-                        if (mListener != null) {
-                            mListener.nextPage();
-                        }
-                    } else {
-                        if (mListener != null) {
-                            mListener.prevPage();
-                        }
-                    }
-                }
-
                 isRunning = false;
-                // 开启动画
-                startAnim();
+                if (!isMove) {
+                    //是否翻阅下一页。true表示翻到下一页，false表示上一页。
+                    boolean isNext = x > mScreenWidth / 2 || readBookControl.getClickAllNext();
+                    if (isNext) {
+                        startAnim(Direction.NEXT);
+                    } else {
+                        startAnim(Direction.PRE);
+                    }
+                } else {
+                    // 开启动画
+                    startAnim();
+                }
                 // 删除检测器
                 mVelocity.recycle();
                 mVelocity = null;
@@ -331,7 +328,6 @@ public class ScrollPageAnim extends PageAnimation {
                 }
                 break;
         }
-        return true;
     }
 
     @Override
@@ -349,7 +345,7 @@ public class ScrollPageAnim extends PageAnimation {
         canvas.clipRect(0, 0, mViewWidth, mViewHeight);
         //绘制Bitmap
         for (int i = 0; i < mActiveViews.size(); ++i) {
-            tmpView = mActiveViews.get(i);
+            BitmapView tmpView = mActiveViews.get(i);
             canvas.drawBitmap(tmpView.bitmap, tmpView.srcRect, tmpView.destRect, null);
         }
         canvas.restore();
@@ -358,21 +354,25 @@ public class ScrollPageAnim extends PageAnimation {
     @Override
     public synchronized void startAnim() {
         super.startAnim();
-        isRunning = true;
         //惯性滚动
         mScroller.fling(0, (int) mTouchY, 0, (int) mVelocity.getYVelocity(), 0, 0, Integer.MAX_VALUE * -1, Integer.MAX_VALUE);
     }
 
-    @Override
-    public void scrollAnim() {
-        if (mScroller.computeScrollOffset()) {
-            int x = mScroller.getCurrX();
-            int y = mScroller.getCurrY();
-            setTouchPoint(x, y);
-            if (mScroller.getFinalX() == x && mScroller.getFinalY() == y) {
-                isRunning = false;
-            }
-            mView.postInvalidate();
+    /**
+     * 翻页动画
+     */
+    public void startAnim(Direction direction) {
+        setStartPoint(0, 0);
+        setTouchPoint(0, 0);
+        switch (direction) {
+            case NEXT:
+                super.startAnim();
+                mScroller.startScroll(0, 0, 0, -mViewHeight + 200, animationSpeed);
+                break;
+            case PRE:
+                super.startAnim();
+                mScroller.startScroll(0, 0, 0, mViewHeight - 200, animationSpeed);
+                break;
         }
     }
 
@@ -385,12 +385,23 @@ public class ScrollPageAnim extends PageAnimation {
     }
 
     @Override
-    public Bitmap getBgBitmap() {
+    public void changePageEnd() {
+        //无操作
+    }
+
+    @Override
+    public Bitmap getBgBitmap(int pageOnCur) {
         return mBgBitmap;
     }
 
     @Override
-    public Bitmap getNextBitmap() {
+    public Bitmap getContentBitmap(int pageOnCur) {
+//        if (pageOnCur < 0) {
+//            return mPrevBitmapView.bitmap;
+//        } else if (pageOnCur > 0) {
+//            return mNextBitmapView.bitmap;
+//        }
+//        return mCurBitmapView.bitmap;
         return mNextBitmap;
     }
 
