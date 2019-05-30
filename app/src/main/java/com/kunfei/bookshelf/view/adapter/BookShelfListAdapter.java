@@ -3,6 +3,8 @@ package com.kunfei.bookshelf.view.adapter;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -12,16 +14,24 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.request.target.Target;
+import com.kunfei.bookshelf.DbHelper;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.bean.BookInfoBean;
 import com.kunfei.bookshelf.bean.BookShelfBean;
-import com.kunfei.bookshelf.dao.DbHelper;
 import com.kunfei.bookshelf.help.BookshelfHelp;
-import com.kunfei.bookshelf.help.MyItemTouchHelpCallback;
-import com.kunfei.bookshelf.utils.Theme.ThemeStore;
+import com.kunfei.bookshelf.help.ItemTouchCallback;
+import com.kunfei.bookshelf.utils.theme.ThemeStore;
 import com.kunfei.bookshelf.view.adapter.base.OnItemClickListenerTwo;
 import com.kunfei.bookshelf.widget.BadgeView;
 import com.victor.loading.rotate.RotateLoading;
@@ -29,20 +39,19 @@ import com.victor.loading.rotate.RotateLoading;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
-
 public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdapter.MyViewHolder> implements BookShelfAdapter {
-
+    private boolean isArrange;
     private Activity activity;
     private List<BookShelfBean> books;
     private OnItemClickListenerTwo itemClickListener;
     private String bookshelfPx;
+    private HashSet<String> selectList = new HashSet<>();
 
-    private MyItemTouchHelpCallback.OnItemTouchCallbackListener itemTouchCallbackListener = new MyItemTouchHelpCallback.OnItemTouchCallbackListener() {
+    private ItemTouchCallback.OnItemTouchCallbackListener itemTouchCallbackListener = new ItemTouchCallback.OnItemTouchCallbackListener() {
         @Override
         public void onSwiped(int adapterPosition) {
 
@@ -58,14 +67,36 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
         }
     };
 
-    @Override
-    public MyItemTouchHelpCallback.OnItemTouchCallbackListener getItemTouchCallbackListener() {
-        return itemTouchCallbackListener;
-    }
 
     public BookShelfListAdapter(Activity activity) {
         this.activity = activity;
         books = new ArrayList<>();
+    }
+
+
+    @Override
+    public ItemTouchCallback.OnItemTouchCallbackListener getItemTouchCallbackListener() {
+        return itemTouchCallbackListener;
+    }
+
+    @Override
+    public void setArrange(boolean isArrange) {
+        selectList.clear();
+        this.isArrange = isArrange;
+        notifyDataSetChanged();
+    }
+
+    @Override
+    public void selectAll() {
+        if (selectList.size() == books.size()) {
+            selectList.clear();
+        } else {
+            for (BookShelfBean bean : books) {
+                selectList.add(bean.getNoteUrl());
+            }
+        }
+        notifyDataSetChanged();
+        itemClickListener.onClick(null, 0);
     }
 
     @Override
@@ -91,7 +122,28 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
 
     @Override
     public void onBindViewHolder(@NonNull MyViewHolder holder, @SuppressLint("RecyclerView") int index) {
-        BookShelfBean bookShelfBean = books.get(index);
+        final BookShelfBean bookShelfBean = books.get(index);
+        holder.itemView.setBackgroundColor(ThemeStore.backgroundColor(activity));
+        if (isArrange) {
+            if (selectList.contains(bookShelfBean.getNoteUrl())) {
+                holder.vwSelect.setBackgroundResource(R.color.ate_button_disabled_light);
+            } else {
+                holder.vwSelect.setBackgroundColor(Color.TRANSPARENT);
+            }
+            holder.vwSelect.setVisibility(View.VISIBLE);
+            holder.vwSelect.setOnClickListener(v -> {
+                if (selectList.contains(bookShelfBean.getNoteUrl())) {
+                    selectList.remove(bookShelfBean.getNoteUrl());
+                    holder.vwSelect.setBackgroundColor(Color.TRANSPARENT);
+                } else {
+                    selectList.add(bookShelfBean.getNoteUrl());
+                    holder.vwSelect.setBackgroundResource(R.color.ate_button_disabled_light);
+                }
+                itemClickListener.onClick(v, index);
+            });
+        } else {
+            holder.vwSelect.setVisibility(View.GONE);
+        }
         BookInfoBean bookInfoBean = bookShelfBean.getBookInfoBean();
         if (!activity.isFinishing()) {
             if (TextUtils.isEmpty(bookShelfBean.getCustomCoverPath())) {
@@ -101,6 +153,19 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
                         .into(holder.ivCover);
             } else if (bookShelfBean.getCustomCoverPath().startsWith("http")) {
                 Glide.with(activity).load(bookShelfBean.getCustomCoverPath())
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+                                bookShelfBean.setCustomCoverPath("");
+                                BookshelfHelp.saveBookToShelf(bookShelfBean);
+                                return false;
+                            }
+
+                            @Override
+                            public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                                return false;
+                            }
+                        })
                         .apply(new RequestOptions().dontAnimate().diskCacheStrategy(DiskCacheStrategy.RESOURCE)
                                 .centerCrop().placeholder(R.drawable.img_cover_default))
                         .into(holder.ivCover);
@@ -145,7 +210,7 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
         }
         if (Objects.equals(bookshelfPx, "2") && bookShelfBean.getSerialNumber() != index) {
             bookShelfBean.setSerialNumber(index);
-            AsyncTask.execute(() -> DbHelper.getInstance().getmDaoSession().getBookShelfBeanDao().insertOrReplace(bookShelfBean));
+            AsyncTask.execute(() -> DbHelper.getDaoSession().getBookShelfBeanDao().insertOrReplace(bookShelfBean));
         }
         if (bookShelfBean.isLoading()) {
             holder.bvUnread.setVisibility(View.INVISIBLE);
@@ -167,6 +232,7 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
     @Override
     public synchronized void replaceAll(List<BookShelfBean> newDataS, String bookshelfPx) {
         this.bookshelfPx = bookshelfPx;
+        selectList.clear();
         if (null != newDataS && newDataS.size() > 0) {
             BookshelfHelp.order(newDataS, bookshelfPx);
             books = newDataS;
@@ -174,11 +240,19 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
             books.clear();
         }
         notifyDataSetChanged();
+        if (isArrange) {
+            itemClickListener.onClick(null, 0);
+        }
     }
 
     @Override
     public List<BookShelfBean> getBooks() {
         return books;
+    }
+
+    @Override
+    public HashSet<String> getSelected() {
+        return selectList;
     }
 
     class MyViewHolder extends RecyclerView.ViewHolder {
@@ -190,6 +264,7 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
         TextView tvRead;
         TextView tvLast;
         RotateLoading rotateLoading;
+        View vwSelect;
 
         MyViewHolder(View itemView) {
             super(itemView);
@@ -202,6 +277,7 @@ public class BookShelfListAdapter extends RecyclerView.Adapter<BookShelfListAdap
             tvAuthor = itemView.findViewById(R.id.tv_author);
             rotateLoading = itemView.findViewById(R.id.rl_loading);
             rotateLoading.setLoadingColor(ThemeStore.accentColor(itemView.getContext()));
+            vwSelect = itemView.findViewById(R.id.vw_select);
         }
     }
 

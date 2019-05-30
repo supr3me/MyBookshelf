@@ -8,17 +8,18 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.kunfei.basemvplib.impl.IPresenter;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.base.MBaseActivity;
-import com.kunfei.bookshelf.utils.FileUtil;
+import com.kunfei.bookshelf.utils.FileUtils;
 import com.kunfei.bookshelf.utils.PermissionUtils;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.Toolbar;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import cn.bingoogolapple.qrcode.core.QRCodeView;
@@ -93,7 +94,7 @@ public class QRCodeScanActivity extends MBaseActivity implements QRCodeView.Dele
     }
 
     private void startCamera() {
-        PermissionUtils.checkMorePermissions(this, cameraPer, new PermissionUtils.PermissionCheckCallBack() {
+        PermissionUtils.checkMorePermissions(this, cameraPer, new PermissionUtils.PermissionCheckCallback() {
             @Override
             public void onHasPermission() {
                 zxingview.startCamera(); // 打开后置摄像头开始预览，但是并未开始识别
@@ -102,11 +103,11 @@ public class QRCodeScanActivity extends MBaseActivity implements QRCodeView.Dele
 
             @Override
             public void onUserHasAlreadyTurnedDown(String... permission) {
-                Toast.makeText(QRCodeScanActivity.this, "扫描二维码需相机权限", Toast.LENGTH_SHORT).show();
+                Toast.makeText(QRCodeScanActivity.this, R.string.qr_per, Toast.LENGTH_SHORT).show();
             }
 
             @Override
-            public void onUserHasAlreadyTurnedDownAndDontAsk(String... permission) {
+            public void onAlreadyTurnedDownAndNoAsk(String... permission) {
                 PermissionUtils.requestMorePermissions(QRCodeScanActivity.this, cameraPer, REQUEST_CAMERA_PER);
             }
         });
@@ -145,7 +146,7 @@ public class QRCodeScanActivity extends MBaseActivity implements QRCodeView.Dele
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        PermissionUtils.checkMorePermissions(QRCodeScanActivity.this, cameraPer, new PermissionUtils.PermissionCheckCallBack() {
+        PermissionUtils.checkMorePermissions(QRCodeScanActivity.this, cameraPer, new PermissionUtils.PermissionCheckCallback() {
             @Override
             public void onHasPermission() {
                 startCamera();
@@ -153,11 +154,11 @@ public class QRCodeScanActivity extends MBaseActivity implements QRCodeView.Dele
 
             @Override
             public void onUserHasAlreadyTurnedDown(String... permission) {
-                Toast.makeText(QRCodeScanActivity.this, "扫描二维码需相机权限", Toast.LENGTH_SHORT).show();
+                Toast.makeText(QRCodeScanActivity.this, R.string.qr_per, Toast.LENGTH_SHORT).show();
             }
 
             @Override
-            public void onUserHasAlreadyTurnedDownAndDontAsk(String... permission) {
+            public void onAlreadyTurnedDownAndNoAsk(String... permission) {
                 PermissionUtils.toAppSetting(QRCodeScanActivity.this);
             }
         });
@@ -201,7 +202,7 @@ public class QRCodeScanActivity extends MBaseActivity implements QRCodeView.Dele
         zxingview.startSpotAndShowRect(); // 显示扫描框，并开始识别
 
         if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_QR_IMAGE) {
-            final String picturePath = FileUtil.getPath(this, data.getData());
+            final String picturePath = FileUtils.getPath(this, data.getData());
             // 本来就用到 QRCodeView 时可直接调 QRCodeView 的方法，走通用的回调
             zxingview.decodeQRCode(picturePath);
         }

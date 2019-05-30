@@ -8,14 +8,16 @@ import android.os.Environment;
 import android.util.Log;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.kunfei.basemvplib.BaseModelImpl;
 import com.kunfei.bookshelf.BuildConfig;
 import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
-import com.kunfei.bookshelf.base.observer.SimpleObserver;
+import com.kunfei.bookshelf.base.BaseModelImpl;
+import com.kunfei.bookshelf.base.observer.MyObserver;
 import com.kunfei.bookshelf.bean.UpdateInfoBean;
 import com.kunfei.bookshelf.model.analyzeRule.AnalyzeHeaders;
 import com.kunfei.bookshelf.model.impl.IHttpGetApi;
@@ -23,7 +25,6 @@ import com.kunfei.bookshelf.view.activity.UpdateActivity;
 
 import java.io.File;
 
-import androidx.core.content.FileProvider;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
@@ -42,13 +43,13 @@ public class UpdateManager {
     }
 
     public void checkUpdate(boolean showMsg) {
-        BaseModelImpl.getRetrofitString("https://api.github.com")
+        BaseModelImpl.getInstance().getRetrofitString("https://api.github.com")
                 .create(IHttpGetApi.class)
-                .getWebContent(MApplication.getInstance().getString(R.string.latest_release_api), AnalyzeHeaders.getMap(null))
+                .get(MApplication.getInstance().getString(R.string.latest_release_api), AnalyzeHeaders.getMap(null))
                 .flatMap(response -> analyzeLastReleaseApi(response.body()))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new SimpleObserver<UpdateInfoBean>() {
+                .subscribe(new MyObserver<UpdateInfoBean>() {
                     @Override
                     public void onNext(UpdateInfoBean updateInfo) {
                         if (updateInfo.getUpDate()) {
@@ -73,8 +74,7 @@ public class UpdateManager {
             try {
                 UpdateInfoBean updateInfo = new UpdateInfoBean();
                 JsonObject version = new JsonParser().parse(jsonStr).getAsJsonObject();
-                boolean prerelease = version.get("prerelease").getAsBoolean();
-                if (prerelease)
+                if (version.get("prerelease").getAsBoolean())
                     return;
                 JsonArray assets = version.get("assets").getAsJsonArray();
                 if (assets.size() > 0) {

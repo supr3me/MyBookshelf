@@ -17,17 +17,10 @@ public class AppFrontBackHelper {
 
     /**
      * 注册状态监听，仅在Application中使用
-     *
-     * @param application
-     * @param listener
      */
     public void register(Application application, OnAppStatusListener listener) {
         mOnAppStatusListener = listener;
         application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks);
-    }
-
-    public void unRegister(Application application) {
-        application.unregisterActivityLifecycleCallbacks(activityLifecycleCallbacks);
     }
 
     private Application.ActivityLifecycleCallbacks activityLifecycleCallbacks = new Application.ActivityLifecycleCallbacks() {

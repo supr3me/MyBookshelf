@@ -1,12 +1,8 @@
 //Copyright (c) 2017. 章钦豪. All rights reserved.
 package com.kunfei.bookshelf.view.popupwindow;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.ContentResolver;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.provider.Settings;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,15 +12,16 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.help.ReadBookControl;
-import com.kunfei.bookshelf.widget.checkbox.SmoothCheckBox;
+import com.kunfei.bookshelf.widget.check_box.SmoothCheckBox;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
 public class ReadAdjustPop extends FrameLayout {
+    @BindView(R.id.vw_bg)
+    View vwBg;
     @BindView(R.id.hpb_light)
     SeekBar hpbLight;
     @BindView(R.id.scb_follow_sys)
@@ -45,11 +42,8 @@ public class ReadAdjustPop extends FrameLayout {
     TextView tvAutoPage;
 
     private Activity context;
-    private Boolean isFollowSys;
-    private int light;
     private ReadBookControl readBookControl = ReadBookControl.getInstance();
-    private OnAdjustListener adjustListener;
-    private SharedPreferences preference = MApplication.getInstance().getConfigPreferences();
+    private Callback callback;
 
     public ReadAdjustPop(Context context) {
         super(context);
@@ -67,15 +61,14 @@ public class ReadAdjustPop extends FrameLayout {
     }
 
     private void init(Context context) {
-        @SuppressLint("InflateParams") View view = LayoutInflater.from(context).inflate(R.layout.pop_read_adjust, null);
-        addView(view);
+        View view = LayoutInflater.from(context).inflate(R.layout.pop_read_adjust, this);
         ButterKnife.bind(this, view);
-        view.setOnClickListener(null);
+        vwBg.setOnClickListener(null);
     }
 
-    public void setListener(Activity activity, OnAdjustListener adjustListener) {
+    public void setListener(Activity activity, Callback callback) {
         this.context = activity;
-        this.adjustListener = adjustListener;
+        this.callback = callback;
         initData();
         bindEvent();
         initLight();
@@ -83,10 +76,6 @@ public class ReadAdjustPop extends FrameLayout {
 
     public void show() {
         initLight();
-    }
-
-    public void dismiss() {
-        saveLight();
     }
 
     private void initData() {
@@ -112,7 +101,7 @@ public class ReadAdjustPop extends FrameLayout {
             }
         });
         scbFollowSys.setOnCheckedChangeListener((checkBox, isChecked) -> {
-            isFollowSys = isChecked;
+            readBookControl.setLightFollowSys(isChecked);
             if (isChecked) {
                 //跟随系统
                 hpbLight.setEnabled(false);
@@ -120,15 +109,15 @@ public class ReadAdjustPop extends FrameLayout {
             } else {
                 //不跟随系统
                 hpbLight.setEnabled(true);
-                setScreenBrightness(light);
+                setScreenBrightness(readBookControl.getLight());
             }
         });
         hpbLight.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if (!isFollowSys) {
-                    light = i;
-                    setScreenBrightness(light);
+                if (!readBookControl.getLightFollowSys()) {
+                    readBookControl.setLight(i);
+                    setScreenBrightness(i);
                 }
             }
 
@@ -175,15 +164,15 @@ public class ReadAdjustPop extends FrameLayout {
                 //跟随系统
                 hpbTtsSpeechRate.setEnabled(false);
                 readBookControl.setSpeechRateFollowSys(true);
-                if (adjustListener != null) {
-                    adjustListener.speechRateFollowSys();
+                if (callback != null) {
+                    callback.speechRateFollowSys();
                 }
             } else {
                 //不跟随系统
                 hpbTtsSpeechRate.setEnabled(true);
                 readBookControl.setSpeechRateFollowSys(false);
-                if (adjustListener != null) {
-                    adjustListener.changeSpeechRate(readBookControl.getSpeechRate());
+                if (callback != null) {
+                    callback.changeSpeechRate(readBookControl.getSpeechRate());
                 }
             }
         });
@@ -201,8 +190,8 @@ public class ReadAdjustPop extends FrameLayout {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 readBookControl.setSpeechRate(seekBar.getProgress() + 5);
-                if (adjustListener != null) {
-                    adjustListener.changeSpeechRate(readBookControl.getSpeechRate());
+                if (callback != null) {
+                    callback.changeSpeechRate(readBookControl.getSpeechRate());
                 }
             }
         });
@@ -214,17 +203,6 @@ public class ReadAdjustPop extends FrameLayout {
         (context).getWindow().setAttributes(params);
     }
 
-    public int getScreenBrightness() {
-        int value = 0;
-        ContentResolver cr = context.getContentResolver();
-        try {
-            value = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS);
-        } catch (Settings.SettingNotFoundException e) {
-            e.printStackTrace();
-        }
-        return value;
-    }
-
     public void setScreenBrightness(int value) {
         if (value < 1) value = 1;
         WindowManager.LayoutParams params = (context).getWindow().getAttributes();
@@ -232,32 +210,15 @@ public class ReadAdjustPop extends FrameLayout {
         (context).getWindow().setAttributes(params);
     }
 
-    private void saveLight() {
-        SharedPreferences.Editor editor = preference.edit();
-        editor.putInt("light", light);
-        editor.putBoolean("isfollowsys", isFollowSys);
-        editor.apply();
-    }
-
-    private int getLight() {
-        return preference.getInt("light", getScreenBrightness());
-    }
-
-    private Boolean getIsFollowSys() {
-        return preference.getBoolean("isfollowsys", true);
-    }
-
     public void initLight() {
-        isFollowSys = getIsFollowSys();
-        light = getLight();
-        hpbLight.setProgress(light);
-        scbFollowSys.setChecked(isFollowSys);
-        if (!isFollowSys) {
-            setScreenBrightness(light);
+        hpbLight.setProgress(readBookControl.getLight());
+        scbFollowSys.setChecked(readBookControl.getLightFollowSys());
+        if (!readBookControl.getLightFollowSys()) {
+            setScreenBrightness(readBookControl.getLight());
         }
     }
 
-    public interface OnAdjustListener {
+    public interface Callback {
         void changeSpeechRate(int speechRate);
 
         void speechRateFollowSys();

@@ -5,6 +5,10 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.hwangjr.rxbus.RxBus;
 import com.hwangjr.rxbus.annotation.Subscribe;
 import com.hwangjr.rxbus.annotation.Tag;
@@ -12,19 +16,18 @@ import com.hwangjr.rxbus.thread.EventThread;
 import com.kunfei.basemvplib.impl.IPresenter;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.base.MBaseFragment;
+import com.kunfei.bookshelf.bean.BookChapterBean;
 import com.kunfei.bookshelf.bean.BookContentBean;
 import com.kunfei.bookshelf.bean.BookShelfBean;
 import com.kunfei.bookshelf.bean.OpenChapterBean;
-import com.kunfei.bookshelf.help.RxBusTag;
+import com.kunfei.bookshelf.constant.RxBusTag;
 import com.kunfei.bookshelf.view.activity.ChapterListActivity;
 import com.kunfei.bookshelf.view.adapter.ChapterListAdapter;
 import com.kunfei.bookshelf.widget.recycler.scroller.FastScrollRecyclerView;
 
+import java.util.List;
 import java.util.Locale;
 
-import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
@@ -34,8 +37,10 @@ public class ChapterListFragment extends MBaseFragment {
     FastScrollRecyclerView rvList;
     @BindView(R.id.tv_current_chapter_info)
     TextView tvChapterInfo;
-    @BindView(R.id.iv_chapter_sort)
-    ImageView ivChapterSort;
+    @BindView(R.id.iv_chapter_top)
+    ImageView ivChapterTop;
+    @BindView(R.id.iv_chapter_bottom)
+    ImageView ivChapterBottom;
     @BindView(R.id.ll_chapter_base_info)
     View llBaseInfo;
     @BindView(R.id.v_shadow)
@@ -48,7 +53,7 @@ public class ChapterListFragment extends MBaseFragment {
     private LinearLayoutManager layoutManager;
 
     private BookShelfBean bookShelf;
-
+    private List<BookChapterBean> chapterBeanList;
     private boolean isChapterReverse;
 
     @Override
@@ -78,6 +83,7 @@ public class ChapterListFragment extends MBaseFragment {
         super.initData();
         if (getFatherActivity() != null) {
             bookShelf = getFatherActivity().getBookShelf();
+            chapterBeanList = getFatherActivity().getChapterBeanList();
         }
         isChapterReverse = preferences.getBoolean("isChapterReverse", false);
     }
@@ -91,7 +97,7 @@ public class ChapterListFragment extends MBaseFragment {
         unbinder = ButterKnife.bind(this, view);
         rvList.setLayoutManager(layoutManager = new LinearLayoutManager(getContext(), RecyclerView.VERTICAL, isChapterReverse));
         rvList.setItemAnimator(null);
-        chapterListAdapter = new ChapterListAdapter(bookShelf, (index, page) -> {
+        chapterListAdapter = new ChapterListAdapter(bookShelf, chapterBeanList, (index, page) -> {
             if (index != bookShelf.getDurChapter()) {
                 RxBus.get().post(RxBusTag.SKIP_TO_CHAPTER, new OpenChapterBean(index, page));
             }
@@ -114,13 +120,10 @@ public class ChapterListFragment extends MBaseFragment {
     protected void bindEvent() {
         super.bindEvent();
         tvChapterInfo.setOnClickListener(view -> layoutManager.scrollToPositionWithOffset(bookShelf.getDurChapter(), 0));
-
-        ivChapterSort.setOnClickListener(v -> {
-            if (chapterListAdapter != null) {
-                isChapterReverse = !isChapterReverse;
-                preferences.edit().putBoolean("isChapterReverse", isChapterReverse).apply();
-                layoutManager.setReverseLayout(isChapterReverse);
-                layoutManager.scrollToPositionWithOffset(bookShelf.getDurChapter(), 0);
+        ivChapterTop.setOnClickListener(v -> rvList.scrollToPosition(0));
+        ivChapterBottom.setOnClickListener(v -> {
+            if (chapterListAdapter.getItemCount() > 0) {
+                rvList.scrollToPosition(chapterListAdapter.getItemCount() - 1);
             }
         });
     }

@@ -3,7 +3,6 @@ package com.kunfei.bookshelf.view.activity;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -15,17 +14,19 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+
 import com.google.android.material.appbar.AppBarLayout;
+import com.kunfei.basemvplib.BitIntentDataManager;
 import com.kunfei.basemvplib.impl.IPresenter;
-import com.kunfei.bookshelf.BitIntentDataManager;
-import com.kunfei.bookshelf.MApplication;
+import com.kunfei.bookshelf.DbHelper;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.base.MBaseActivity;
 import com.kunfei.bookshelf.bean.BookSourceBean;
-import com.kunfei.bookshelf.utils.Theme.ThemeStore;
+import com.kunfei.bookshelf.bean.CookieBean;
+import com.kunfei.bookshelf.utils.theme.ThemeStore;
 
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.Toolbar;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
@@ -50,12 +51,7 @@ public class SourceLoginActivity extends MBaseActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         String key = String.valueOf(System.currentTimeMillis());
         intent.putExtra("data_key", key);
-        try {
-            BitIntentDataManager.getInstance().putData(key, bookSourceBean.clone());
-        } catch (CloneNotSupportedException e) {
-            BitIntentDataManager.getInstance().putData(key, bookSourceBean);
-            e.printStackTrace();
-        }
+        BitIntentDataManager.getInstance().putData(key, bookSourceBean.clone());
         context.startActivity(intent);
     }
 
@@ -102,22 +98,18 @@ public class SourceLoginActivity extends MBaseActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 String cookie = cookieManager.getCookie(url);
-                SharedPreferences.Editor editor = MApplication.getCookiePreferences().edit();
-                editor.putString(bookSourceBean.getBookSourceUrl(), cookie);
-                editor.apply();
+                DbHelper.getDaoSession().getCookieBeanDao().insertOrReplace(new CookieBean(bookSourceBean.getBookSourceUrl(), cookie));
                 super.onPageStarted(view, url, favicon);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 String cookie = cookieManager.getCookie(url);
-                SharedPreferences.Editor editor = MApplication.getCookiePreferences().edit();
-                editor.putString(bookSourceBean.getBookSourceUrl(), cookie);
-                editor.apply();
+                DbHelper.getDaoSession().getCookieBeanDao().insertOrReplace(new CookieBean(bookSourceBean.getBookSourceUrl(), cookie));
                 if (checking)
                     finish();
                 else
-                    showSnackBar(toolbar, "登录成功后请点击右上角图标进行首页访问测试");
+                    showSnackBar(toolbar, getString(R.string.click_check_after_success));
                 super.onPageFinished(view, url);
             }
         });
@@ -148,7 +140,7 @@ public class SourceLoginActivity extends MBaseActivity {
             case R.id.action_check:
                 if (checking) break;
                 checking = true;
-                showSnackBar(toolbar, "正在打开首页，成功自动返回主界面");
+                showSnackBar(toolbar, getString(R.string.check_host_cookie));
                 webView.loadUrl(bookSourceBean.getBookSourceUrl());
                 break;
             case android.R.id.home:

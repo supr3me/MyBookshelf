@@ -4,23 +4,23 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceScreen;
 
+import androidx.appcompat.app.AlertDialog;
+
 import com.hwangjr.rxbus.RxBus;
 import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
-import com.kunfei.bookshelf.help.RxBusTag;
+import com.kunfei.bookshelf.constant.RxBusTag;
+import com.kunfei.bookshelf.help.LauncherIcon;
 import com.kunfei.bookshelf.utils.ColorUtil;
-import com.kunfei.bookshelf.utils.Theme.ATH;
+import com.kunfei.bookshelf.utils.theme.ATH;
 import com.kunfei.bookshelf.view.activity.ThemeSettingActivity;
 
 import java.util.Objects;
-
-import androidx.appcompat.app.AlertDialog;
 
 /**
  * Created by GKF on 2017/12/16.
@@ -33,8 +33,10 @@ public class ThemeSettingsFragment extends PreferenceFragment implements SharedP
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getPreferenceManager().setSharedPreferencesName("CONFIG");
-        addPreferencesFromResource(R.xml.theme_settings);
+        addPreferencesFromResource(R.xml.pref_settings_theme);
         settingActivity = (ThemeSettingActivity) this.getActivity();
+        SharedPreferences sharedPreferences = getPreferenceManager().getSharedPreferences();
+        sharedPreferences.edit().putString("launcher_icon", LauncherIcon.getInUseIcon()).apply();
     }
 
     private static Preference.OnPreferenceChangeListener sBindPreferenceSummaryToValueListener = (Preference preference, Object value) -> {
@@ -75,6 +77,15 @@ public class ThemeSettingsFragment extends PreferenceFragment implements SharedP
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         AlertDialog alertDialog;
         switch (key) {
+            case "launcher_icon":
+                LauncherIcon.ChangeIcon(sharedPreferences.getString("launcher_icon", getString(R.string.icon_main)));
+                break;
+            case "behaviorMain":
+                RxBus.get().post(RxBusTag.RECREATE, true);
+                break;
+            case "E-InkMode":
+                MApplication.getInstance().upEInkMode();
+                break;
             case "immersionStatusBar":
             case "navigationBarColorChange":
                 settingActivity.initImmersionBar();
@@ -124,7 +135,9 @@ public class ThemeSettingsFragment extends PreferenceFragment implements SharedP
         if (settingActivity.isNightTheme() == isNightTheme) {
             MApplication.getInstance().upThemeStore();
             RxBus.get().post(RxBusTag.RECREATE, true);
-            new Handler().postDelayed(() -> getActivity().recreate(), 200);
+            if (getActivity() != null) {
+                getActivity().recreate();
+            }
         }
     }
 
@@ -146,7 +159,8 @@ public class ThemeSettingsFragment extends PreferenceFragment implements SharedP
                         MApplication.getInstance().upThemeStore();
                         RxBus.get().post(RxBusTag.RECREATE, true);
                     })
-                    .setNegativeButton(R.string.cancel, (dialogInterface, i) -> {})
+                    .setNegativeButton(R.string.cancel, (dialogInterface, i) -> {
+                    })
                     .show();
             ATH.setAlertDialogTint(alertDialog);
         }

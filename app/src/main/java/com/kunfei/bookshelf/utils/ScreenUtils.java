@@ -1,20 +1,20 @@
 package com.kunfei.bookshelf.utils;
 
+import android.annotation.SuppressLint;
 import android.content.res.Resources;
 import android.util.DisplayMetrics;
-import android.util.TypedValue;
 import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.kunfei.bookshelf.MApplication;
 
 import java.lang.reflect.Method;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 /**
  * Created by newbiechen on 17-5-1.
  */
-
+@SuppressWarnings({"unused", "WeakerAccess"})
 public class ScreenUtils {
 
     public static int dpToPx(int dp) {
@@ -92,6 +92,7 @@ public class ScreenUtils {
      *
      * @return
      */
+    @SuppressWarnings("unchecked")
     private static boolean hasNavigationBar() {
         boolean hasNavigationBar = false;
         Resources rs = MApplication.getInstance().getResources();
@@ -100,7 +101,7 @@ public class ScreenUtils {
             hasNavigationBar = rs.getBoolean(id);
         }
         try {
-            Class systemPropertiesClass = Class.forName("android.os.SystemProperties");
+            @SuppressLint("PrivateApi") Class systemPropertiesClass = Class.forName("android.os.SystemProperties");
             Method m = systemPropertiesClass.getMethod("get", String.class);
             String navBarOverride = (String) m.invoke(systemPropertiesClass, "qemu.hw.mainkeys");
             if ("1".equals(navBarOverride)) {

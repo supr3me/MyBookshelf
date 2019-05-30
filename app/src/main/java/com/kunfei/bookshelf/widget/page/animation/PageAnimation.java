@@ -2,16 +2,17 @@ package com.kunfei.bookshelf.widget.page.animation;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 import android.widget.Scroller;
 
+import androidx.annotation.NonNull;
+
 import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.help.ReadBookControl;
-
-import androidx.annotation.NonNull;
 
 /**
  * 翻页动画抽象类
@@ -37,6 +38,8 @@ public abstract class PageAnimation {
     //视图的尺寸
     int mViewWidth;
     int mViewHeight;
+    // 唤醒菜单的区域
+    RectF mCenterRect;
     //起始点
     float mStartX;
     float mStartY;
@@ -46,9 +49,8 @@ public abstract class PageAnimation {
     //上一个触碰点
     float mLastX;
     float mLastY;
-
+    private boolean isMoving = false;
     boolean isRunning = false;
-    boolean changePage = false;
 
     PageAnimation(int w, int h, View view, OnPageChangeListener listener) {
         this(w, h, 0, 0, 0, view, listener);
@@ -68,6 +70,10 @@ public abstract class PageAnimation {
         mListener = listener;
 
         mScroller = new Scroller(mView.getContext(), new LinearInterpolator());
+
+        //设置中间区域范围
+        mCenterRect = new RectF(mViewWidth / 3f, mViewHeight / 3f,
+                mViewWidth * 2f / 3, mViewHeight * 2f / 3);
     }
 
     public Scroller getScroller() {
@@ -94,8 +100,9 @@ public abstract class PageAnimation {
         return isRunning;
     }
 
-    public boolean isChangePage() {
-        return changePage;
+    void movingFinish() {
+        isMoving = false;
+        isRunning = false;
     }
 
     /**
@@ -103,11 +110,8 @@ public abstract class PageAnimation {
      */
     public void startAnim() {
         isRunning = true;
-        mView.postInvalidate();
-    }
-
-    public Direction getDirection() {
-        return mDirection;
+        isMoving = true;
+        mView.invalidate();
     }
 
     public void setDirection(Direction direction) {
@@ -139,10 +143,13 @@ public abstract class PageAnimation {
 
             setTouchPoint(x, y);
 
-            if (mScroller.getFinalX() == x && mScroller.getFinalY() == y) {
-                isRunning = false;
-            }
             mView.postInvalidate();
+        } else if (isMoving) {
+            if (changePage()) {
+                mListener.changePage(mDirection);
+                setDirection(PageAnimation.Direction.NONE);
+            }
+            movingFinish();
         }
     }
 
@@ -151,19 +158,13 @@ public abstract class PageAnimation {
      */
     public abstract void abortAnim();
 
-    public abstract void changePageEnd();
+    public abstract boolean changePage();
 
     /**
      * 获取背景板
      * pageOnCur: 位于当前页的位置, 小于0上一页, 0 当前页, 大于0下一页
      */
     public abstract Bitmap getBgBitmap(int pageOnCur);
-
-    /**
-     * 获取内容显示版面
-     * pageOnCur: 位于当前页的位置, 小于0上一页, 0 当前页, 大于0下一页
-     */
-    public abstract Bitmap getContentBitmap(int pageOnCur);
 
     /**
      * 翻页模式
@@ -213,7 +214,7 @@ public abstract class PageAnimation {
      * 翻页方向
      */
     public enum Direction {
-        NONE(true), NEXT(true), PRE(true), UP(false), DOWN(false);
+        NONE(true), NEXT(true), PREV(true);
 
         public final boolean isHorizontal;
 
@@ -233,6 +234,10 @@ public abstract class PageAnimation {
         void drawContent(Canvas canvas, float offset);
 
         void drawBackground(Canvas canvas);
+
+        void changePage(Direction direction);
+
+        void clickCenter();
     }
 
 }
