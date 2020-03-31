@@ -64,6 +64,7 @@ public class NetworkUtils {
      * 获取绝对地址
      */
     public static String getAbsoluteURL(String baseURL, String relativePath) {
+        if (TextUtils.isEmpty(relativePath)) return "";
         if (TextUtils.isEmpty(baseURL)) return relativePath;
         String header = null;
         if (StringUtils.startWithIgnoreCase(relativePath, "@header:")) {
@@ -120,7 +121,6 @@ public class NetworkUtils {
      * Check if valid IPV4 address.
      *
      * @param input the address string to check for validity.
-     *
      * @return True if the input parameter is a valid IPv4 address.
      */
     public static boolean isIPv4Address(String input) {

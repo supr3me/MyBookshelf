@@ -8,14 +8,14 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.kunfei.bookshelf.R;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
 
 public class FontAdapter extends RecyclerView.Adapter<FontAdapter.MyViewHolder> {
     private List<File> fileList = new ArrayList<>();
@@ -61,7 +61,7 @@ public class FontAdapter extends RecyclerView.Adapter<FontAdapter.MyViewHolder> 
         return fileList.size() == 0 ? 1 : fileList.size();
     }
 
-    public void upData(File[] files) {
+    void upData(File[] files) {
         if (files != null) {
             fileList.clear();
             for (File file : files) {

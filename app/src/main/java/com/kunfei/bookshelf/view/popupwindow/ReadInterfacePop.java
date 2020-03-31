@@ -8,28 +8,26 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
-import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.help.ReadBookControl;
-import com.kunfei.bookshelf.utils.PermissionUtils;
+import com.kunfei.bookshelf.help.permission.Permissions;
+import com.kunfei.bookshelf.help.permission.PermissionsCompat;
 import com.kunfei.bookshelf.utils.theme.ATH;
 import com.kunfei.bookshelf.view.activity.ReadBookActivity;
 import com.kunfei.bookshelf.view.activity.ReadStyleActivity;
 import com.kunfei.bookshelf.widget.font.FontSelector;
-import com.kunfei.bookshelf.widget.number.NumberButton;
 import com.kunfei.bookshelf.widget.page.animation.PageAnimation;
-
-import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import de.hdodenhof.circleimageview.CircleImageView;
+import kotlin.Unit;
 
 public class ReadInterfacePop extends FrameLayout {
     @BindView(R.id.vw_bg)
@@ -58,34 +56,27 @@ public class ReadInterfacePop extends FrameLayout {
     TextView tv3;
     @BindView(R.id.tv4)
     TextView tv4;
-    @BindView(R.id.nbPaddingTop)
-    NumberButton nbPaddingTop;
-    @BindView(R.id.nbPaddingBottom)
-    NumberButton nbPaddingBottom;
-    @BindView(R.id.nbPaddingLeft)
-    NumberButton nbPaddingLeft;
-    @BindView(R.id.nbPaddingRight)
-    NumberButton nbPaddingRight;
-    @BindView(R.id.tvPageMode)
-    TextView tvPageMode;
+
     @BindView(R.id.nbTextSize)
-    NumberButton nbTextSize;
-    @BindView(R.id.nbLineSize)
-    NumberButton nbLineSize;
-    @BindView(R.id.nbParagraphSize)
-    NumberButton nbParagraphSize;
+    TextView nbTextSize;
+    @BindView(R.id.nbTextSizeAdd)
+    TextView nbTextSizeAdd;
+    @BindView(R.id.nbTextSizeDec)
+    TextView nbTextSizeDec;
     @BindView(R.id.fl_indent)
     TextView tvIndent;
-    @BindView(R.id.nbTipPaddingTop)
-    NumberButton nbTipPaddingTop;
-    @BindView(R.id.nbTipPaddingBottom)
-    NumberButton nbTipPaddingBottom;
-    @BindView(R.id.nbTipPaddingLeft)
-    NumberButton nbTipPaddingLeft;
-    @BindView(R.id.nbTipPaddingRight)
-    NumberButton nbTipPaddingRight;
-    @BindView(R.id.nbLetterSpacing)
-    NumberButton nbLetterSpacing;
+    @BindView(R.id.tvPageMode)
+    TextView tvPageMode;
+    @BindView(R.id.tvRowDef0)
+    TextView tvRowDef0;
+    @BindView(R.id.tvRowDef1)
+    TextView tvRowDef1;
+    @BindView(R.id.tvRowDef2)
+    TextView tvRowDef2;
+    @BindView(R.id.tvRowDef)
+    TextView tvRowDef;
+    @BindView(R.id.tvOther)
+    ImageView tvOther;
 
     private ReadBookActivity activity;
     private ReadBookControl readBookControl = ReadBookControl.getInstance();
@@ -125,135 +116,28 @@ public class ReadInterfacePop extends FrameLayout {
         updateBoldText(readBookControl.getTextBold());
         updatePageMode(readBookControl.getPageMode());
 
-        nbTextSize.setTitle(activity.getString(R.string.text_size))
-                .setMinNumber(10)
-                .setMaxNumber(40)
-                .setNumber(readBookControl.getTextSize())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTextSize((int) number);
-                    callback.upTextSize();
-                });
-
-        nbLetterSpacing.setTitle(activity.getContext().getString(R.string.text_letter_spacing))
-                .setNumberType(NumberButton.FLOAT)
-                .setMinNumber(-0.5f)
-                .setMaxNumber(0.5f)
-                .setStepNumber(0.01f)
-                .setFormat("0.00")
-                .setNumber(readBookControl.getTextLetterSpacing())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTextLetterSpacing(number);
-                    callback.upTextSize();
-                });
-
-        nbLineSize.setTitle(activity.getString(R.string.line_size))
-                .setNumberType(NumberButton.FLOAT)
-                .setMinNumber(0.5f)
-                .setMaxNumber(3f)
-                .setStepNumber(0.1f)
-                .setFormat("0.0")
-                .setNumber(readBookControl.getLineMultiplier())
-                .setOnChangedListener(number -> {
-                    readBookControl.setLineMultiplier(number);
-                    callback.upTextSize();
-                });
-
-        nbParagraphSize.setTitle(activity.getString(R.string.paragraph_size))
-                .setNumberType(NumberButton.FLOAT)
-                .setMinNumber(1f)
-                .setMaxNumber(5f)
-                .setStepNumber(0.1f)
-                .setFormat("0.0")
-                .setNumber(readBookControl.getParagraphSize())
-                .setOnChangedListener(number -> {
-                    readBookControl.setParagraphSize(number);
-                    callback.upTextSize();
-                });
-
-        nbPaddingTop.setTitle(activity.getString(R.string.padding_top))
-                .setMinNumber(0)
-                .setMaxNumber(100)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getPaddingTop())
-                .setOnChangedListener(number -> {
-                    readBookControl.setPaddingTop((int) number);
-                    callback.upMargin();
-                });
-
-        nbPaddingBottom.setTitle(activity.getString(R.string.padding_bottom))
-                .setMinNumber(0)
-                .setMaxNumber(100)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getPaddingBottom())
-                .setOnChangedListener(number -> {
-                    readBookControl.setPaddingBottom((int) number);
-                    callback.upMargin();
-                });
-
-        nbPaddingLeft.setTitle(activity.getString(R.string.padding_left))
-                .setMinNumber(0)
-                .setMaxNumber(50)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getPaddingLeft())
-                .setOnChangedListener(number -> {
-                    readBookControl.setPaddingLeft((int) number);
-                    callback.upMargin();
-                });
-
-        nbPaddingRight.setTitle(activity.getString(R.string.padding_right))
-                .setMinNumber(0)
-                .setMaxNumber(50)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getPaddingRight())
-                .setOnChangedListener(number -> {
-                    readBookControl.setPaddingRight((int) number);
-                    callback.upMargin();
-                });
-        nbTipPaddingTop.setTitle(activity.getString(R.string.padding_top))
-                .setMinNumber(0)
-                .setMaxNumber(100)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getTipPaddingTop())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTipPaddingTop((int) number);
-                    callback.upMargin();
-                });
-
-        nbTipPaddingBottom.setTitle(activity.getString(R.string.padding_bottom))
-                .setMinNumber(0)
-                .setMaxNumber(100)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getTipPaddingBottom())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTipPaddingBottom((int) number);
-                    callback.upMargin();
-                });
-
-        nbTipPaddingLeft.setTitle(activity.getString(R.string.padding_left))
-                .setMinNumber(0)
-                .setMaxNumber(50)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getTipPaddingLeft())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTipPaddingLeft((int) number);
-                    callback.upMargin();
-                });
-
-        nbTipPaddingRight.setTitle(activity.getString(R.string.padding_right))
-                .setMinNumber(0)
-                .setMaxNumber(50)
-                .setStepNumber(1)
-                .setNumber(readBookControl.getTipPaddingRight())
-                .setOnChangedListener(number -> {
-                    readBookControl.setTipPaddingRight((int) number);
-                    callback.upMargin();
-                });
-    }
+        nbTextSize.setText(String.format("%d", readBookControl.getTextSize()));    }
 
     /**
      * 控件事件
      */
     private void bindEvent() {
+        //字号减
+        nbTextSizeDec.setOnClickListener(v -> {
+            int fontSize = readBookControl.getTextSize() - 1;
+            if (fontSize < 10) fontSize = 10;
+            readBookControl.setTextSize(fontSize);
+            nbTextSize.setText(String.format("%d", readBookControl.getTextSize()));
+            callback.upTextSize();
+        });
+        //字号加
+        nbTextSizeAdd.setOnClickListener(v -> {
+            int fontSize = readBookControl.getTextSize() + 1;
+            if (fontSize > 40) fontSize = 40;
+            readBookControl.setTextSize(fontSize);
+            nbTextSize.setText(String.format("%d", readBookControl.getTextSize()));
+            callback.upTextSize();
+        });
         //缩进
         tvIndent.setOnClickListener(v -> {
             AlertDialog dialog = new AlertDialog.Builder(activity, R.style.alertDialogTheme)
@@ -287,7 +171,35 @@ public class ReadInterfacePop extends FrameLayout {
         flTextBold.setOnClickListener(view -> {
             readBookControl.setTextBold(!readBookControl.getTextBold());
             updateBoldText(readBookControl.getTextBold());
-            callback.refresh();
+            callback.upTextSize();
+        });
+        //行距单倍
+        tvRowDef0.setOnClickListener(v -> {
+            readBookControl.setLineMultiplier(0.6f);
+            readBookControl.setParagraphSize(1.5f);
+            callback.upTextSize();
+        });
+        //行距双倍
+        tvRowDef1.setOnClickListener(v -> {
+            readBookControl.setLineMultiplier(1.2f);
+            readBookControl.setParagraphSize(1.8f);
+            callback.upTextSize();
+        });
+        //行距三倍
+        tvRowDef2.setOnClickListener(v -> {
+            readBookControl.setLineMultiplier(1.8f);
+            readBookControl.setParagraphSize(2.0f);
+            callback.upTextSize();
+        });
+        //行距默认
+        tvRowDef.setOnClickListener(v -> {
+            readBookControl.setLineMultiplier(1.0f);
+            readBookControl.setParagraphSize(1.8f);
+            callback.upTextSize();
+        });
+        //自定义间距
+        tvOther.setOnClickListener(v -> {
+            activity.readAdjustMarginIn();
         });
         //背景选择
         civBgWhite.setOnClickListener(v -> {
@@ -319,26 +231,27 @@ public class ReadInterfacePop extends FrameLayout {
 
         //选择字体
         fl_text_font.setOnClickListener(view -> {
-            List<String> per = PermissionUtils.checkMorePermissions(activity, MApplication.PerList);
-            if (per.isEmpty()) {
-                new FontSelector(activity, readBookControl.getFontPath())
-                        .setListener(new FontSelector.OnThisListener() {
-                            @Override
-                            public void setDefault() {
-                                clearFontPath();
-                            }
+            new PermissionsCompat.Builder(activity)
+                    .addPermissions(Permissions.READ_EXTERNAL_STORAGE, Permissions.WRITE_EXTERNAL_STORAGE)
+                    .rationale(R.string.get_storage_per)
+                    .onGranted((requestCode) -> {
+                        new FontSelector(activity, readBookControl.getFontPath())
+                                .setListener(new FontSelector.OnThisListener() {
+                                    @Override
+                                    public void setDefault() {
+                                        clearFontPath();
+                                    }
 
-                            @Override
-                            public void setFontPath(String fontPath) {
-                                setReadFonts(fontPath);
-                            }
-                        })
-                        .create()
-                        .show();
-            } else {
-                Toast.makeText(activity, "本软件需要存储权限来存储备份书籍信息", Toast.LENGTH_SHORT).show();
-                PermissionUtils.requestMorePermissions(activity, per, MApplication.RESULT__PERMS);
-            }
+                                    @Override
+                                    public void setFontPath(String fontPath) {
+                                        setReadFonts(fontPath);
+                                    }
+                                })
+                                .create()
+                                .show();
+                        return Unit.INSTANCE;
+                    })
+                    .request();
         });
 
         //长按清除字体
@@ -347,7 +260,6 @@ public class ReadInterfacePop extends FrameLayout {
             activity.toast(R.string.clear_font);
             return true;
         });
-
     }
 
     //自定义阅读样式
@@ -371,7 +283,7 @@ public class ReadInterfacePop extends FrameLayout {
     }
 
     private void updatePageMode(int pageMode) {
-        tvPageMode.setText(String.format(activity.getString(R.string.page_mode) + ":%s", PageAnimation.Mode.getPageMode(pageMode)));
+        tvPageMode.setText(String.format("%s", PageAnimation.Mode.getPageMode(pageMode)));
     }
 
     private void updateBoldText(Boolean isBold) {

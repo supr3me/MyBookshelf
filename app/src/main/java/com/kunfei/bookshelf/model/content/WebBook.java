@@ -136,14 +136,25 @@ public class WebBook extends BaseModelImpl {
     /**
      * 获取正文
      */
-    public Observable<BookContentBean> getBookContent(final BaseChapterBean chapterBean, final BookShelfBean bookShelfBean) {
+    public Observable<BookContentBean> getBookContent(final BaseChapterBean chapterBean, final BaseChapterBean nextChapterBean, final BookShelfBean bookShelfBean) {
         if (bookSourceBean == null) {
             return Observable.error(new NoSourceThrowable(chapterBean.getTag()));
+        }
+        if (isEmpty(bookSourceBean.getRuleBookContent())) {
+            return Observable.create(emitter -> {
+                BookContentBean bookContentBean = new BookContentBean();
+                bookContentBean.setDurChapterContent(chapterBean.getDurChapterUrl());
+                bookContentBean.setDurChapterIndex(chapterBean.getDurChapterIndex());
+                bookContentBean.setTag(bookShelfBean.getTag());
+                bookContentBean.setDurChapterUrl(chapterBean.getDurChapterUrl());
+                emitter.onNext(bookContentBean);
+                emitter.onComplete();
+            });
         }
         BookContent bookContent = new BookContent(tag, bookSourceBean);
         if (Objects.equals(chapterBean.getDurChapterUrl(), bookShelfBean.getBookInfoBean().getChapterUrl())
                 && !TextUtils.isEmpty(bookShelfBean.getBookInfoBean().getChapterListHtml())) {
-            return bookContent.analyzeBookContent(bookShelfBean.getBookInfoBean().getChapterListHtml(), chapterBean, bookShelfBean, headerMap);
+            return bookContent.analyzeBookContent(bookShelfBean.getBookInfoBean().getChapterListHtml(), chapterBean, nextChapterBean, bookShelfBean, headerMap);
         }
         try {
             AnalyzeUrl analyzeUrl = new AnalyzeUrl(chapterBean.getDurChapterUrl(), headerMap, bookShelfBean.getBookInfoBean().getChapterUrl());
@@ -162,11 +173,11 @@ public class WebBook extends BaseModelImpl {
                     }
                 }
                 return getAjaxString(analyzeUrl, tag, js)
-                        .flatMap(response -> bookContent.analyzeBookContent(response, chapterBean, bookShelfBean, headerMap));
+                        .flatMap(response -> bookContent.analyzeBookContent(response, chapterBean, nextChapterBean, bookShelfBean, headerMap));
             } else {
                 return getResponseO(analyzeUrl)
                         .flatMap(response -> setCookie(response, tag))
-                        .flatMap(response -> bookContent.analyzeBookContent(response, chapterBean, bookShelfBean, headerMap));
+                        .flatMap(response -> bookContent.analyzeBookContent(response, chapterBean, nextChapterBean, bookShelfBean, headerMap));
             }
         } catch (Exception e) {
             return Observable.error(new Throwable(String.format("url错误:%s", chapterBean.getDurChapterUrl())));
@@ -174,7 +185,6 @@ public class WebBook extends BaseModelImpl {
     }
 
     public class NoSourceThrowable extends Throwable {
-
         NoSourceThrowable(String tag) {
             super(String.format("%s没有找到书源配置", tag));
         }

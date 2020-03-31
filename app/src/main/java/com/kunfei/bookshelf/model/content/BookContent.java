@@ -7,7 +7,6 @@ import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.base.BaseModelImpl;
 import com.kunfei.bookshelf.bean.BaseChapterBean;
-import com.kunfei.bookshelf.bean.BookChapterBean;
 import com.kunfei.bookshelf.bean.BookContentBean;
 import com.kunfei.bookshelf.bean.BookShelfBean;
 import com.kunfei.bookshelf.bean.BookSourceBean;
@@ -46,12 +45,12 @@ class BookContent {
         }
     }
 
-    Observable<BookContentBean> analyzeBookContent(final Response<String> response, final BaseChapterBean chapterBean, BookShelfBean bookShelfBean, Map<String, String> headerMap) {
+    Observable<BookContentBean> analyzeBookContent(final Response<String> response, final BaseChapterBean chapterBean, final BaseChapterBean nextChapterBean, BookShelfBean bookShelfBean, Map<String, String> headerMap) {
         baseUrl = NetworkUtils.getUrl(response);
-        return analyzeBookContent(response.body(), chapterBean, bookShelfBean, headerMap);
+        return analyzeBookContent(response.body(), chapterBean, nextChapterBean, bookShelfBean, headerMap);
     }
 
-    Observable<BookContentBean> analyzeBookContent(final String s, final BaseChapterBean chapterBean, BookShelfBean bookShelfBean, Map<String, String> headerMap) {
+    Observable<BookContentBean> analyzeBookContent(final String s, final BaseChapterBean chapterBean, final BaseChapterBean nextChapterBean, BookShelfBean bookShelfBean, Map<String, String> headerMap) {
         return Observable.create(e -> {
             if (TextUtils.isEmpty(s)) {
                 e.onError(new Throwable(MApplication.getInstance().getString(R.string.get_content_error) + chapterBean.getDurChapterUrl()));
@@ -61,7 +60,7 @@ class BookContent {
                 baseUrl = NetworkUtils.getAbsoluteURL(bookShelfBean.getBookInfoBean().getChapterUrl(), chapterBean.getDurChapterUrl());
             }
             if (StringUtils.isJsonType(s) && !MApplication.getInstance().getDonateHb()) {
-                e.onError(new Throwable(MApplication.getInstance().getString(R.string.donate_s)));
+                e.onError(new VipThrowable());
                 e.onComplete();
                 return;
             }
@@ -72,7 +71,7 @@ class BookContent {
             bookContentBean.setDurChapterUrl(chapterBean.getDurChapterUrl());
             bookContentBean.setTag(tag);
             AnalyzeRule analyzer = new AnalyzeRule(bookShelfBean);
-            WebContentBean webContentBean = analyzeBookContent(analyzer, s, chapterBean.getDurChapterUrl(), true, baseUrl);
+            WebContentBean webContentBean = analyzeBookContent(analyzer, s, chapterBean.getDurChapterUrl(), baseUrl);
             bookContentBean.setDurChapterContent(webContentBean.content);
 
             /*
@@ -81,21 +80,27 @@ class BookContent {
             if (!TextUtils.isEmpty(webContentBean.nextUrl)) {
                 List<String> usedUrlList = new ArrayList<>();
                 usedUrlList.add(chapterBean.getDurChapterUrl());
-                BookChapterBean nextChapter = DbHelper.getDaoSession().getBookChapterBeanDao().queryBuilder()
-                        .where(BookChapterBeanDao.Properties.NoteUrl.eq(chapterBean.getNoteUrl()),
-                                BookChapterBeanDao.Properties.DurChapterIndex.eq(chapterBean.getDurChapterIndex() + 1))
-                        .build().unique();
+                BaseChapterBean nextChapter;
+                if (nextChapterBean != null) {
+                    nextChapter = nextChapterBean;
+                } else {
+                    nextChapter = DbHelper.getDaoSession().getBookChapterBeanDao().queryBuilder()
+                            .where(BookChapterBeanDao.Properties.NoteUrl.eq(chapterBean.getNoteUrl()),
+                                    BookChapterBeanDao.Properties.DurChapterIndex.eq(chapterBean.getDurChapterIndex() + 1))
+                            .build().unique();
+                }
+
                 while (!TextUtils.isEmpty(webContentBean.nextUrl) && !usedUrlList.contains(webContentBean.nextUrl)) {
                     usedUrlList.add(webContentBean.nextUrl);
-                    if (nextChapter != null && webContentBean.nextUrl.equals(nextChapter.getDurChapterUrl())) {
+                    if (nextChapter != null && NetworkUtils.getAbsoluteURL(baseUrl, webContentBean.nextUrl).equals(NetworkUtils.getAbsoluteURL(baseUrl, nextChapter.getDurChapterUrl()))) {
                         break;
                     }
-                    AnalyzeUrl analyzeUrl = new AnalyzeUrl(webContentBean.nextUrl, headerMap, tag );
+                    AnalyzeUrl analyzeUrl = new AnalyzeUrl(webContentBean.nextUrl, headerMap, tag);
                     try {
                         String body;
                         Response<String> response = BaseModelImpl.getInstance().getResponseO(analyzeUrl).blockingFirst();
                         body = response.body();
-                        webContentBean = analyzeBookContent(analyzer, body, webContentBean.nextUrl, false, baseUrl);
+                        webContentBean = analyzeBookContent(analyzer, body, webContentBean.nextUrl, baseUrl);
                         if (!TextUtils.isEmpty(webContentBean.content)) {
                             bookContentBean.setDurChapterContent(bookContentBean.getDurChapterContent() + "\n" + webContentBean.content);
                         }
@@ -111,18 +116,23 @@ class BookContent {
         });
     }
 
-    private WebContentBean analyzeBookContent(AnalyzeRule analyzer, final String s, final String chapterUrl, boolean printLog, String baseUrl) throws Exception {
+    private WebContentBean analyzeBookContent(AnalyzeRule analyzer, final String s, final String chapterUrl, String baseUrl) throws Exception {
         WebContentBean webContentBean = new WebContentBean();
 
         analyzer.setContent(s, NetworkUtils.getAbsoluteURL(baseUrl, chapterUrl));
-        Debug.printLog(tag, "┌解析正文内容", printLog);
-        webContentBean.content = StringUtils.formatHtml(analyzer.getString(ruleBookContent));
-        Debug.printLog(tag, "└" + webContentBean.content, printLog);
+        Debug.printLog(tag, 1, "┌解析正文内容");
+        if (ruleBookContent.equals("all") || ruleBookContent.contains("@all")) {
+            webContentBean.content = analyzer.getString(ruleBookContent);
+        }
+        else {
+            webContentBean.content = StringUtils.formatHtml(analyzer.getString(ruleBookContent));
+        }
+        Debug.printLog(tag, 1, "└" + webContentBean.content);
         String nextUrlRule = bookSourceBean.getRuleContentUrlNext();
         if (!TextUtils.isEmpty(nextUrlRule)) {
-            Debug.printLog(tag, "┌解析下一页url", printLog);
+            Debug.printLog(tag, 1, "┌解析下一页url");
             webContentBean.nextUrl = analyzer.getString(nextUrlRule, true);
-            Debug.printLog(tag, "└" + webContentBean.nextUrl, printLog);
+            Debug.printLog(tag, 1, "└" + webContentBean.nextUrl);
         }
 
         return webContentBean;

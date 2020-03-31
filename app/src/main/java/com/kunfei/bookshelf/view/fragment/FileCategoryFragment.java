@@ -4,6 +4,10 @@ import android.graphics.PorterDuff;
 import android.os.Environment;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.kunfei.basemvplib.impl.IPresenter;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.help.BookshelfHelp;
@@ -24,9 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import androidx.appcompat.app.AlertDialog;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
@@ -152,7 +153,9 @@ public class FileCategoryFragment extends BaseFileFragment {
 
     private void setTextViewIconColor(TextView textView) {
         // textView.getCompoundDrawables()[0].mutate();
-        textView.getCompoundDrawables()[0].setColorFilter(getResources().getColor(R.color.tv_text_default), PorterDuff.Mode.SRC_ATOP);
+        try {
+            textView.getCompoundDrawables()[0].setColorFilter(getResources().getColor(R.color.tv_text_default), PorterDuff.Mode.SRC_ATOP);
+        } catch (Exception e) {}
     }
 
     private void toggleFileTree(File file) {
@@ -211,7 +214,7 @@ public class FileCategoryFragment extends BaseFileFragment {
                 return false;
             }
             //文件夹内部数量为0
-            if (pathname.isDirectory() && pathname.list().length == 0) {
+            if (pathname.isDirectory() && (pathname.list() == null || pathname.list().length == 0)) {
                 return false;
             }
 

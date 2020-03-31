@@ -4,7 +4,7 @@
     <shortcut
         android:shortcutId="bookRead"
         android:enabled="true"
-        android:icon="@drawable/icon_read_book"
+        android:icon="@drawable/ic_read_book"
         android:shortcutShortLabel="@string/last_read"
         android:shortcutLongLabel="@string/last_read"
         android:shortcutDisabledMessage="@string/last_read"
@@ -12,15 +12,21 @@
 
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.gedoor.monkeybook"
-            android:targetClass="com.kunfei.bookshelf.view.activity.WelcomeToReadActivity" />
+            android:targetPackage="${applicationId}"
+            android:targetClass="com.kunfei.bookshelf.view.activity.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="${applicationId}"
+            android:targetClass="com.kunfei.bookshelf.view.activity.ReadBookActivity" />
         <categories android:name="android.shortcut.conversation"/>
     </shortcut>
 
     <shortcut
         android:shortcutId="bookshelf"
         android:enabled="true"
-        android:icon="@drawable/icon_read_book"
+        android:icon="@drawable/ic_read_book"
         android:shortcutShortLabel="@string/bookshelf"
         android:shortcutLongLabel="@string/bookshelf"
         android:shortcutDisabledMessage="@string/bookshelf"
@@ -28,7 +34,7 @@
 
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.gedoor.monkeybook"
+            android:targetPackage="${applicationId}"
             android:targetClass="com.kunfei.bookshelf.view.activity.MainActivity" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>

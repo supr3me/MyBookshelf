@@ -29,7 +29,6 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
 import androidx.viewpager.widget.ViewPager;
 
 import com.google.android.material.appbar.AppBarLayout;
@@ -44,14 +43,15 @@ import com.kunfei.bookshelf.base.BaseTabActivity;
 import com.kunfei.bookshelf.constant.RxBusTag;
 import com.kunfei.bookshelf.help.FileHelp;
 import com.kunfei.bookshelf.help.ProcessTextHelp;
+import com.kunfei.bookshelf.help.permission.Permissions;
+import com.kunfei.bookshelf.help.permission.PermissionsCompat;
+import com.kunfei.bookshelf.help.storage.BackupRestoreUi;
 import com.kunfei.bookshelf.model.UpLastChapterModel;
 import com.kunfei.bookshelf.presenter.MainPresenter;
 import com.kunfei.bookshelf.presenter.contract.MainContract;
 import com.kunfei.bookshelf.service.WebService;
 import com.kunfei.bookshelf.utils.ACache;
-import com.kunfei.bookshelf.utils.PermissionUtils;
 import com.kunfei.bookshelf.utils.StringUtils;
-import com.kunfei.bookshelf.utils.theme.ATH;
 import com.kunfei.bookshelf.utils.theme.NavigationViewUtil;
 import com.kunfei.bookshelf.utils.theme.ThemeStore;
 import com.kunfei.bookshelf.view.fragment.BookListFragment;
@@ -65,13 +65,12 @@ import java.util.Objects;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import kotlin.Unit;
 
 import static com.kunfei.bookshelf.utils.NetworkUtils.isNetWorkAvailable;
 
-public class MainActivity extends BaseTabActivity<MainContract.Presenter> implements MainContract.View, BookListFragment.CallbackValue {
-    private static final int BACKUP_RESULT = 11;
-    private static final int RESTORE_RESULT = 12;
-    private static final int FILE_SELECT_RESULT = 13;
+public class MainActivity extends BaseTabActivity<MainContract.Presenter> implements MainContract.View,
+        BookListFragment.CallbackValue {
     private final int requestSource = 14;
     private String[] mTitles;
 
@@ -88,7 +87,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     private AppCompatImageView vwNightTheme;
     private int group;
-    private boolean viewIsList;
     private ActionBarDrawerToggle mDrawerToggle;
     private MoDialogHUD moDialogHUD;
     private long exitTime = 0;
@@ -132,9 +130,17 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
             InputDialog.builder(this)
                     .setTitle(getString(R.string.add_book_url))
                     .setDefaultValue(shared_url)
-                    .setCallback(inputText -> {
-                        inputText = StringUtils.trim(inputText);
-                        mPresenter.addBookUrl(inputText);
+                    .setCallback(new InputDialog.Callback() {
+                        @Override
+                        public void setInputText(String inputText) {
+                            inputText = StringUtils.trim(inputText);
+                            mPresenter.addBookUrl(inputText);
+                        }
+
+                        @Override
+                        public void delete(String value) {
+
+                        }
                     }).show();
             preferences.edit()
                     .putString("shared_url", "")
@@ -153,7 +159,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     protected void initData() {
-        viewIsList = preferences.getBoolean("bookshelfIsList", true);
         mTitles = new String[]{getString(R.string.bookshelf), getString(R.string.find)};
     }
 
@@ -174,8 +179,19 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     protected List<Fragment> createTabFragments() {
-        BookListFragment bookListFragment = new BookListFragment();
-        FindBookFragment findBookFragment = new FindBookFragment();
+        BookListFragment bookListFragment = null;
+        FindBookFragment findBookFragment = null;
+        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+            if (fragment instanceof BookListFragment) {
+                bookListFragment = (BookListFragment) fragment;
+            } else if (fragment instanceof FindBookFragment) {
+                findBookFragment = (FindBookFragment) fragment;
+            }
+        }
+        if (bookListFragment == null)
+            bookListFragment = new BookListFragment();
+        if (findBookFragment == null)
+            findBookFragment = new FindBookFragment();
         return Arrays.asList(bookListFragment, findBookFragment);
     }
 
@@ -386,12 +402,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem pauseMenu = menu.findItem(R.id.action_list_grid);
-        if (viewIsList) {
-            pauseMenu.setTitle(R.string.action_grid);
-        } else {
-            pauseMenu.setTitle(R.string.action_list);
-        }
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -407,45 +417,43 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        SharedPreferences.Editor editor = preferences.edit();
         int id = item.getItemId();
         switch (id) {
             case R.id.action_add_local:
-                PermissionUtils.checkMorePermissions(this, MApplication.PerList, new PermissionUtils.PermissionCheckCallback() {
-                    @Override
-                    public void onHasPermission() {
-                        startActivity(new Intent(MainActivity.this, ImportBookActivity.class));
-                    }
-
-                    @Override
-                    public void onUserHasAlreadyTurnedDown(String... permission) {
-                        MainActivity.this.toast(R.string.import_per);
-                    }
-
-                    @Override
-                    public void onAlreadyTurnedDownAndNoAsk(String... permission) {
-                        MainActivity.this.toast(R.string.please_grant_storage_permission);
-                        PermissionUtils.requestMorePermissions(MainActivity.this, permission, FILE_SELECT_RESULT);
-                    }
-                });
+                new PermissionsCompat.Builder(this)
+                        .addPermissions(Permissions.READ_EXTERNAL_STORAGE, Permissions.WRITE_EXTERNAL_STORAGE)
+                        .rationale(R.string.import_per)
+                        .onGranted((requestCode) -> {
+                            startActivity(new Intent(MainActivity.this, ImportBookActivity.class));
+                            return Unit.INSTANCE;
+                        })
+                        .request();
                 break;
             case R.id.action_add_url:
                 InputDialog.builder(this)
                         .setTitle(getString(R.string.add_book_url))
-                        .setCallback(inputText -> {
-                            inputText = StringUtils.trim(inputText);
-                            mPresenter.addBookUrl(inputText);
+                        .setCallback(new InputDialog.Callback() {
+                            @Override
+                            public void setInputText(String inputText) {
+                                inputText = StringUtils.trim(inputText);
+                                mPresenter.addBookUrl(inputText);
+                            }
+
+                            @Override
+                            public void delete(String value) {
+
+                            }
                         }).show();
                 break;
             case R.id.action_download_all:
-                if (!isNetWorkAvailable())
+                if (!isNetWorkAvailable()) {
                     toast(R.string.network_connection_unavailable);
-                else
+                } else {
                     RxBus.get().post(RxBusTag.DOWNLOAD_ALL, 10000);
+                }
                 break;
-            case R.id.action_list_grid:
-                editor.putBoolean("bookshelfIsList", !viewIsList).apply();
-                recreate();
+            case R.id.menu_bookshelf_layout:
+                selectBookshelfLayout();
                 break;
             case R.id.action_arrange_bookshelf:
                 if (getBookListFragment() != null) {
@@ -453,11 +461,13 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
                 }
                 break;
             case R.id.action_web_start:
-                WebService.startThis(this);
+                boolean startedThisTime = WebService.startThis(this);
+                if (!startedThisTime) {
+                    toast(getString(R.string.web_service_already_started_hint));
+                }
                 break;
             case android.R.id.home:
-                if (drawer.isDrawerOpen(GravityCompat.START)
-                ) {
+                if (drawer.isDrawerOpen(GravityCompat.START)) {
                     drawer.closeDrawers();
                 } else {
                     drawer.openDrawer(GravityCompat.START, !MApplication.isEInkMode);
@@ -509,10 +519,12 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
      * 侧边栏按钮
      */
     private void setUpNavigationView() {
-        NavigationViewUtil.setItemTextColors(navigationView, getResources().getColor(R.color.tv_text_default), ThemeStore.accentColor(this));
+        navigationView.setBackgroundColor(ThemeStore.backgroundColor(this));
         NavigationViewUtil.setItemIconColors(navigationView, getResources().getColor(R.color.tv_text_default), ThemeStore.accentColor(this));
         NavigationViewUtil.disableScrollbar(navigationView);
         @SuppressLint("InflateParams") View headerView = LayoutInflater.from(this).inflate(R.layout.navigation_header, null);
+        AppCompatImageView imageView = headerView.findViewById(R.id.iv_read);
+        imageView.setColorFilter(ThemeStore.accentColor(this));
         navigationView.addHeaderView(headerView);
         Menu drawerMenu = navigationView.getMenu();
         vwNightTheme = drawerMenu.findItem(R.id.action_theme).getActionView().findViewById(R.id.iv_theme_day_night);
@@ -540,10 +552,10 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
                     handler.postDelayed(() -> DonateActivity.startThis(this), 200);
                     break;
                 case R.id.action_backup:
-                    handler.postDelayed(this::backup, 200);
+                    handler.postDelayed(() -> BackupRestoreUi.INSTANCE.backup(this), 200);
                     break;
                 case R.id.action_restore:
-                    handler.postDelayed(this::restore, 200);
+                    handler.postDelayed(() -> BackupRestoreUi.INSTANCE.restore(this), 200);
                     break;
                 case R.id.action_theme:
                     handler.postDelayed(() -> ThemeSettingActivity.startThis(this), 200);
@@ -567,61 +579,13 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
         vwNightTheme.getDrawable().mutate().setColorFilter(ThemeStore.accentColor(this), PorterDuff.Mode.SRC_ATOP);
     }
 
-    /**
-     * 备份
-     */
-    private void backup() {
-        PermissionUtils.checkMorePermissions(this, MApplication.PerList, new PermissionUtils.PermissionCheckCallback() {
-            @Override
-            public void onHasPermission() {
-                AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this)
-                        .setTitle(R.string.backup_confirmation)
-                        .setMessage(R.string.backup_message)
-                        .setPositiveButton(R.string.ok, (dialog, which) -> mPresenter.backupData())
-                        .setNegativeButton(R.string.cancel, null)
-                        .show();
-                ATH.setAlertDialogTint(alertDialog);
-            }
-
-            @Override
-            public void onUserHasAlreadyTurnedDown(String... permission) {
-                MainActivity.this.toast(R.string.backup_permission);
-            }
-
-            @Override
-            public void onAlreadyTurnedDownAndNoAsk(String... permission) {
-                MainActivity.this.toast(R.string.backup_permission);
-                PermissionUtils.requestMorePermissions(MainActivity.this, permission, BACKUP_RESULT);
-            }
-        });
-    }
-
-    /**
-     * 恢复
-     */
-    private void restore() {
-        PermissionUtils.checkMorePermissions(this, MApplication.PerList, new PermissionUtils.PermissionCheckCallback() {
-            @Override
-            public void onHasPermission() {
-                AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this)
-                        .setTitle(R.string.restore_confirmation)
-                        .setMessage(R.string.restore_message)
-                        .setPositiveButton(R.string.ok, (dialog, which) -> mPresenter.restoreData())
-                        .setNegativeButton(R.string.cancel, null)
-                        .show();
-                ATH.setAlertDialogTint(alertDialog);
-            }
-
-            @Override
-            public void onUserHasAlreadyTurnedDown(String... permission) {
-                MainActivity.this.toast(R.string.restore_permission);
-            }
-
-            @Override
-            public void onAlreadyTurnedDownAndNoAsk(String... permission) {
-                PermissionUtils.requestMorePermissions(MainActivity.this, permission, RESTORE_RESULT);
-            }
-        });
+    private void selectBookshelfLayout() {
+        new AlertDialog.Builder(this)
+                .setTitle("选择书架布局")
+                .setItems(R.array.bookshelf_layout, (dialog, which) -> {
+                    preferences.edit().putInt("bookshelfLayout", which).apply();
+                    recreate();
+                }).show();
     }
 
     /**
@@ -638,24 +602,16 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
         }
     }
 
-    /**
-     * 获取权限
-     */
-    private void requestPermission() {
-        List<String> per = PermissionUtils.checkMorePermissions(this, MApplication.PerList);
-        if (per.size() > 0) {
-            toast(R.string.get_storage_per);
-            PermissionUtils.requestMorePermissions(this, per, MApplication.RESULT__PERMS);
-        }
-    }
-
     @Override
     protected void firstRequest() {
         if (!isRecreate) {
             versionUpRun();
         }
         if (!Objects.equals(MApplication.downloadPath, FileHelp.getFilesPath())) {
-            requestPermission();
+            new PermissionsCompat.Builder(this)
+                    .addPermissions(Permissions.READ_EXTERNAL_STORAGE, Permissions.WRITE_EXTERNAL_STORAGE)
+                    .rationale(R.string.get_storage_per)
+                    .request();
         }
         handler.postDelayed(() -> {
             UpLastChapterModel.getInstance().startUpdate();
@@ -672,58 +628,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     public void onRestore(String msg) {
         moDialogHUD.showLoading(msg);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        PermissionUtils.checkMorePermissions(this, MApplication.PerList, new PermissionUtils.PermissionCheckCallback() {
-            @Override
-            public void onHasPermission() {
-                switch (requestCode) {
-                    case FILE_SELECT_RESULT:
-                        startActivity(new Intent(MainActivity.this, ImportBookActivity.class));
-                        break;
-                    case BACKUP_RESULT:
-                        backup();
-                        break;
-                    case RESTORE_RESULT:
-                        restore();
-                        break;
-                }
-            }
-
-            @Override
-            public void onUserHasAlreadyTurnedDown(String... permission) {
-                switch (requestCode) {
-                    case FILE_SELECT_RESULT:
-                        MainActivity.this.toast(R.string.import_book_per);
-                        break;
-                    case BACKUP_RESULT:
-                        MainActivity.this.toast(R.string.backup_permission);
-                        break;
-                    case RESTORE_RESULT:
-                        MainActivity.this.toast(R.string.restore_permission);
-                        break;
-                }
-            }
-
-            @Override
-            public void onAlreadyTurnedDownAndNoAsk(String... permission) {
-                switch (requestCode) {
-                    case FILE_SELECT_RESULT:
-                        MainActivity.this.toast(R.string.import_book_per);
-                        break;
-                    case BACKUP_RESULT:
-                        MainActivity.this.toast(R.string.backup_permission);
-                        break;
-                    case RESTORE_RESULT:
-                        MainActivity.this.toast(R.string.restore_permission);
-                        break;
-                }
-                PermissionUtils.toAppSetting(MainActivity.this);
-            }
-        });
     }
 
     @SuppressLint("RtlHardcoded")
@@ -762,14 +666,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     public void recreate() {
-        try {//避免重启太快恢复
-            FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
-            for (Fragment fragment : mFragmentList) {
-                fragmentTransaction.remove(fragment);
-            }
-            fragmentTransaction.commitAllowingStateLoss();
-        } catch (Exception ignored) {
-        }
         super.recreate();
     }
 
@@ -783,13 +679,16 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
-            if (requestCode == requestSource) {
-                FindBookFragment findBookFragment = getFindFragment();
-                if (findBookFragment != null) {
-                    findBookFragment.refreshData();
+        BackupRestoreUi.INSTANCE.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            case requestSource:
+                if (resultCode == RESULT_OK) {
+                    FindBookFragment findBookFragment = getFindFragment();
+                    if (findBookFragment != null) {
+                        findBookFragment.refreshData();
+                    }
                 }
-            }
+                break;
         }
     }
 

@@ -20,6 +20,9 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 
+import static android.text.TextUtils.isEmpty;
+import static com.kunfei.bookshelf.constant.AppConstant.TIME_OUT;
+
 public class WebBookModel {
 
     public static WebBookModel getInstance() {
@@ -33,7 +36,7 @@ public class WebBookModel {
     public Observable<BookShelfBean> getBookInfo(BookShelfBean bookShelfBean) {
         return WebBook.getInstance(bookShelfBean.getTag())
                 .getBookInfo(bookShelfBean)
-                .timeout(60, TimeUnit.SECONDS);
+                .timeout(TIME_OUT, TimeUnit.SECONDS);
     }
 
     /**
@@ -44,17 +47,17 @@ public class WebBookModel {
         return WebBook.getInstance(bookShelfBean.getTag())
                 .getChapterList(bookShelfBean)
                 .flatMap((chapterList) -> upChapterList(bookShelfBean, chapterList))
-                .timeout(180, TimeUnit.SECONDS);
+                .timeout(TIME_OUT, TimeUnit.SECONDS);
     }
 
     /**
      * 章节缓存
      */
-    public Observable<BookContentBean> getBookContent(BookShelfBean bookShelfBean, BaseChapterBean chapterBean) {
+    public Observable<BookContentBean> getBookContent(BookShelfBean bookShelfBean, BaseChapterBean chapterBean, BaseChapterBean nextChapterBean) {
         return WebBook.getInstance(chapterBean.getTag())
-                .getBookContent(chapterBean, bookShelfBean)
+                .getBookContent(chapterBean, nextChapterBean, bookShelfBean)
                 .flatMap((bookContentBean -> saveContent(bookShelfBean.getBookInfoBean(), chapterBean, bookContentBean)))
-                .timeout(60, TimeUnit.SECONDS);
+                .timeout(TIME_OUT, TimeUnit.SECONDS);
     }
 
     /**
@@ -63,7 +66,7 @@ public class WebBookModel {
     public Observable<List<SearchBookBean>> searchBook(String content, int page, String tag) {
         return WebBook.getInstance(tag)
                 .searchBook(content, page)
-                .timeout(60, TimeUnit.SECONDS);
+                .timeout(TIME_OUT, TimeUnit.SECONDS);
     }
 
     /**
@@ -72,7 +75,7 @@ public class WebBookModel {
     public Observable<List<SearchBookBean>> findBook(String url, int page, String tag) {
         return WebBook.getInstance(tag)
                 .findBook(url, page)
-                .timeout(60, TimeUnit.SECONDS);
+                .timeout(TIME_OUT, TimeUnit.SECONDS);
     }
 
     /**
@@ -109,7 +112,7 @@ public class WebBookModel {
     private Observable<BookContentBean> saveContent(BookInfoBean infoBean, BaseChapterBean chapterBean, BookContentBean bookContentBean) {
         return Observable.create(e -> {
             bookContentBean.setNoteUrl(chapterBean.getNoteUrl());
-            if (bookContentBean.getDurChapterContent() == null) {
+            if (isEmpty(bookContentBean.getDurChapterContent())) {
                 e.onError(new Throwable("下载章节出错"));
             } else if (infoBean.isAudio()) {
                 bookContentBean.setTimeMillis(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));

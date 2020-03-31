@@ -21,7 +21,6 @@ import com.kunfei.bookshelf.base.observer.MyObserver;
 import com.kunfei.bookshelf.bean.UpdateInfoBean;
 import com.kunfei.bookshelf.model.analyzeRule.AnalyzeHeaders;
 import com.kunfei.bookshelf.model.impl.IHttpGetApi;
-import com.kunfei.bookshelf.view.activity.UpdateActivity;
 
 import java.io.File;
 
@@ -53,10 +52,10 @@ public class UpdateManager {
                     @Override
                     public void onNext(UpdateInfoBean updateInfo) {
                         if (updateInfo.getUpDate()) {
-                            UpdateActivity.startThis(activity, updateInfo);
+
                         } else if (showMsg) {
                             Toast.makeText(activity, "已是最新版本", Toast.LENGTH_SHORT).show();
-                            UpdateActivity.startThis(activity, updateInfo);
+
                         }
                     }
 
@@ -84,7 +83,7 @@ public class UpdateManager {
                     String thisVersion = MApplication.getVersionName().split("\\s")[0];
                     updateInfo.setUrl(url);
                     updateInfo.setLastVersion(lastVersion);
-                    updateInfo.setDetail("# "+lastVersion +"\n"+ detail);
+                    updateInfo.setDetail("# " + lastVersion + "\n" + detail);
                     if (Integer.valueOf(lastVersion.split("\\.")[2]) > Integer.valueOf(thisVersion.split("\\.")[2])) {
                         updateInfo.setUpDate(true);
                     } else {

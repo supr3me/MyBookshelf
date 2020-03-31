@@ -240,11 +240,11 @@ public class MoDialogHUD {
     /**
      * 两个不同等级的按钮
      */
-    public void showTwoButton(String msg, String b_f, View.OnClickListener c_f, String b_s, View.OnClickListener c_s) {
+    public void showTwoButton(String msg, String b_f, View.OnClickListener c_f, String b_s, View.OnClickListener c_s, boolean canBack) {
         initCenter();
         initAnimation();
-        canBack = true;
-        rootView.setOnClickListener(null);
+        this.canBack = canBack;
+        rootView.setOnClickListener(v -> dismiss());
         mSharedView.showTwoButton(msg, b_f, c_f, b_s, c_s);
         if (!isShowing()) {
             onAttached();

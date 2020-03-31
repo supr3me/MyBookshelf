@@ -8,6 +8,7 @@ import com.kunfei.bookshelf.bean.BookContentBean;
 import com.kunfei.bookshelf.bean.BookShelfBean;
 import com.kunfei.bookshelf.help.BookshelfHelp;
 import com.kunfei.bookshelf.model.WebBookModel;
+import com.kunfei.bookshelf.model.content.VipThrowable;
 import com.kunfei.bookshelf.model.content.WebBook;
 import com.kunfei.bookshelf.utils.NetworkUtils;
 import com.kunfei.bookshelf.utils.RxUtils;
@@ -93,7 +94,8 @@ public class PageLoaderNet extends PageLoader {
     @SuppressLint("DefaultLocale")
     private synchronized void loadContent(final int chapterIndex) {
         if (downloadingChapterList.size() >= 20) return;
-        if (DownloadingList(listHandle.CHECK, callback.getChapterList().get(chapterIndex).getDurChapterUrl()))
+        if (chapterIndex >= callback.getChapterList().size()
+                || DownloadingList(listHandle.CHECK, callback.getChapterList().get(chapterIndex).getDurChapterUrl()))
             return;
         if (null != book && callback.getChapterList().size() > 0) {
             Observable.create((ObservableOnSubscribe<Integer>) e -> {
@@ -103,7 +105,7 @@ public class PageLoaderNet extends PageLoader {
                 }
                 e.onComplete();
             })
-                    .flatMap(index -> WebBookModel.getInstance().getBookContent(book, callback.getChapterList().get(chapterIndex)))
+                    .flatMap(index -> WebBookModel.getInstance().getBookContent(book, callback.getChapterList().get(chapterIndex), null))
                     .subscribeOn(scheduler)
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(new MyObserver<BookContentBean>() {
@@ -125,6 +127,8 @@ public class PageLoaderNet extends PageLoader {
                             if (chapterIndex == book.getDurChapter()) {
                                 if (e instanceof WebBook.NoSourceThrowable) {
                                     mPageView.autoChangeSource();
+                                } else if (e instanceof VipThrowable) {
+                                    callback.vipPop();
                                 } else {
                                     durDhapterError(e.getMessage());
                                 }
@@ -189,7 +193,7 @@ public class PageLoaderNet extends PageLoader {
     @SuppressLint("DefaultLocale")
     @Override
     protected boolean noChapterData(BookChapterBean chapter) {
-        return !BookshelfHelp.isChapterCached(book.getBookInfoBean().getName(), book.getTag(), chapter, book.getBookInfoBean().isAudio());
+        return !BookshelfHelp.isChapterCached(book.getBookInfoBean().getName(), book.getTag(), chapter, book.isAudio());
     }
 
     private boolean shouldRequestChapter(Integer chapterIndex) {

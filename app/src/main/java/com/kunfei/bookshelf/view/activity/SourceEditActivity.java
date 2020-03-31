@@ -54,9 +54,12 @@ import com.kunfei.bookshelf.view.adapter.SourceEditAdapter;
 import com.kunfei.bookshelf.view.popupwindow.KeyboardToolPop;
 import com.kunfei.bookshelf.widget.views.ATECheckBox;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -75,7 +78,7 @@ import static android.text.TextUtils.isEmpty;
  * 编辑书源
  */
 
-public class SourceEditActivity extends MBaseActivity<SourceEditContract.Presenter> implements SourceEditContract.View {
+public class SourceEditActivity extends MBaseActivity<SourceEditContract.Presenter> implements SourceEditContract.View, KeyboardToolPop.CallBack {
     public final static int EDIT_SOURCE = 1101;
     private final int REQUEST_QR = 202;
 
@@ -104,6 +107,8 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
     private PopupWindow mSoftKeyboardTool;
     private boolean mIsSoftKeyBoardShowing = false;
     private boolean showFind;
+    private String[] keyHelp = {"@", "&", "|", "%", "/", ":", "[", "]", "{", "}", "<", ">", "\\", "$", "#", "!", ".",
+            "href", "src", "textNodes", "xpath", "json", "css", "id", "class", "tag"};
 
     public static void startThis(Object object, BookSourceBean sourceBean) {
         String key = String.valueOf(System.currentTimeMillis());
@@ -178,7 +183,7 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         ButterKnife.bind(this);
         this.setSupportActionBar(toolbar);
         setupActionBar();
-        mSoftKeyboardTool = new KeyboardToolPop(this, this::insertTextToEditText);
+        mSoftKeyboardTool = new KeyboardToolPop(this, Arrays.asList(keyHelp), this);
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(new KeyboardOnGlobalChangeListener());
         adapter = new SourceEditAdapter(this);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -207,7 +212,7 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
     private boolean canSaveBookSource() {
         SoftInputUtil.hideIMM(recyclerView);
         recyclerView.clearFocus();
-        BookSourceBean bookSourceBean = getBookSource();
+        BookSourceBean bookSourceBean = getBookSource(true);
         if (isEmpty(bookSourceBean.getBookSourceName()) || isEmpty(bookSourceBean.getBookSourceUrl())) {
             toast(R.string.non_null_source_name_url, ERROR);
             return false;
@@ -216,12 +221,12 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
     }
 
     @Override
-    public String getBookSourceStr() {
+    public String getBookSourceStr(boolean hasFind) {
         Gson gson = new GsonBuilder()
                 .disableHtmlEscaping()
                 .setPrettyPrinting()
                 .create();
-        return gson.toJson(getBookSource());
+        return gson.toJson(getBookSource(hasFind));
     }
 
     @Override
@@ -288,7 +293,7 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         startActivityForResult(intent, REQUEST_QR);
     }
 
-    private BookSourceBean getBookSource() {
+    private BookSourceBean getBookSource(boolean hasFind) {
         BookSourceBean bookSourceBeanN = new BookSourceBean();
         for (SourceEdit sourceEdit : sourceEditList) {
             switch (sourceEdit.getKey()) {
@@ -381,35 +386,37 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
                     break;
             }
         }
-        for (SourceEdit sourceEdit : findEditList) {
-            switch (sourceEdit.getKey()) {
-                case "ruleFindUrl":
-                    bookSourceBeanN.setRuleFindUrl(sourceEdit.value);
-                    break;
-                case "ruleFindList":
-                    bookSourceBeanN.setRuleFindList(sourceEdit.value);
-                    break;
-                case "ruleFindName":
-                    bookSourceBeanN.setRuleFindName(sourceEdit.value);
-                    break;
-                case "ruleFindAuthor":
-                    bookSourceBeanN.setRuleFindAuthor(sourceEdit.value);
-                    break;
-                case "ruleFindKind":
-                    bookSourceBeanN.setRuleFindKind(sourceEdit.value);
-                    break;
-                case "ruleFindIntroduce":
-                    bookSourceBeanN.setRuleFindIntroduce(sourceEdit.value);
-                    break;
-                case "ruleFindLastChapter":
-                    bookSourceBeanN.setRuleFindLastChapter(sourceEdit.value);
-                    break;
-                case "ruleFindCoverUrl":
-                    bookSourceBeanN.setRuleFindCoverUrl(sourceEdit.value);
-                    break;
-                case "ruleFindNoteUrl":
-                    bookSourceBeanN.setRuleFindNoteUrl(sourceEdit.value);
-                    break;
+        if (hasFind) {
+            for (SourceEdit sourceEdit : findEditList) {
+                switch (sourceEdit.getKey()) {
+                    case "ruleFindUrl":
+                        bookSourceBeanN.setRuleFindUrl(sourceEdit.value);
+                        break;
+                    case "ruleFindList":
+                        bookSourceBeanN.setRuleFindList(sourceEdit.value);
+                        break;
+                    case "ruleFindName":
+                        bookSourceBeanN.setRuleFindName(sourceEdit.value);
+                        break;
+                    case "ruleFindAuthor":
+                        bookSourceBeanN.setRuleFindAuthor(sourceEdit.value);
+                        break;
+                    case "ruleFindKind":
+                        bookSourceBeanN.setRuleFindKind(sourceEdit.value);
+                        break;
+                    case "ruleFindIntroduce":
+                        bookSourceBeanN.setRuleFindIntroduce(sourceEdit.value);
+                        break;
+                    case "ruleFindLastChapter":
+                        bookSourceBeanN.setRuleFindLastChapter(sourceEdit.value);
+                        break;
+                    case "ruleFindCoverUrl":
+                        bookSourceBeanN.setRuleFindCoverUrl(sourceEdit.value);
+                        break;
+                    case "ruleFindNoteUrl":
+                        bookSourceBeanN.setRuleFindNoteUrl(sourceEdit.value);
+                        break;
+                }
             }
         }
         bookSourceBeanN.setSerialNumber(serialNumber);
@@ -422,7 +429,7 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
     private void shareBookSource() {
         Single.create((SingleOnSubscribe<Bitmap>) emitter -> {
             QRCodeEncoder.HINTS.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
-            Bitmap bitmap = QRCodeEncoder.syncEncodeQRCode(getBookSourceStr(), 600);
+            Bitmap bitmap = QRCodeEncoder.syncEncodeQRCode(getBookSourceStr(true), 600);
             QRCodeEncoder.HINTS.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H);
             emitter.onSuccess(bitmap);
         }).compose(RxUtils::toSimpleSingle)
@@ -466,6 +473,17 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         }
     }
 
+    private void shareText(String title, String text) {
+        try {
+            Intent textIntent = new Intent(Intent.ACTION_SEND);
+            textIntent.setType("text/plain");
+            textIntent.putExtra(Intent.EXTRA_TEXT, text);
+            startActivity(Intent.createChooser(textIntent, title));
+        } catch (Exception e) {
+            toast(R.string.can_not_share, ERROR);
+        }
+    }
+
     //设置ToolBar
     private void setupActionBar() {
         ActionBar actionBar = getSupportActionBar();
@@ -489,11 +507,11 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         switch (id) {
             case R.id.action_save:
                 if (canSaveBookSource()) {
-                    mPresenter.saveSource(getBookSource(), bookSourceBean)
+                    mPresenter.saveSource(getBookSource(true), bookSourceBean)
                             .subscribe(new MyObserver<Boolean>() {
                                 @Override
                                 public void onNext(Boolean aBoolean) {
-                                    bookSourceBean = getBookSource();
+                                    bookSourceBean = getBookSource(true);
                                     toast("保存成功");
                                     setResult(RESULT_OK);
                                     finish();
@@ -507,14 +525,17 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
                 }
                 break;
             case R.id.action_login:
-                if (!isEmpty(getBookSource().getLoginUrl())) {
-                    SourceLoginActivity.startThis(this, getBookSource());
+                if (!isEmpty(getBookSource(true).getLoginUrl())) {
+                    SourceLoginActivity.startThis(this, getBookSource(true));
                 } else {
                     toast(R.string.source_no_login);
                 }
                 break;
             case R.id.action_copy_source:
-                mPresenter.copySource(getBookSource());
+                mPresenter.copySource(getBookSourceStr(true));
+                break;
+            case R.id.action_copy_source_no_find:
+                mPresenter.copySource(getBookSourceStr(false));
                 break;
             case R.id.action_paste_source:
                 mPresenter.pasteSource();
@@ -525,21 +546,24 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
             case R.id.action_share_it:
                 shareBookSource();
                 break;
+            case R.id.action_share_str:
+                shareText("Source Share", getBookSourceStr(true));
+                break;
             case R.id.action_share_wifi:
-                ShareService.startThis(this, Collections.singletonList(getBookSource()));
+                ShareService.startThis(this, Collections.singletonList(getBookSource(true)));
                 break;
             case R.id.action_rule_summary:
                 openRuleSummary();
                 break;
             case R.id.action_debug_source:
                 if (canSaveBookSource()) {
-                    mPresenter.saveSource(getBookSource(), bookSourceBean)
+                    mPresenter.saveSource(getBookSource(true), bookSourceBean)
                             .subscribe(new MyObserver<Boolean>() {
                                 @Override
                                 public void onNext(Boolean aBoolean) {
-                                    bookSourceBean = getBookSource();
+                                    bookSourceBean = getBookSource(true);
                                     setResult(RESULT_OK);
-                                    SourceDebugActivity.startThis(SourceEditActivity.this, getBookSource().getBookSourceUrl());
+                                    SourceDebugActivity.startThis(SourceEditActivity.this, getBookSource(true).getBookSourceUrl());
                                 }
 
                                 @Override
@@ -602,11 +626,19 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         return super.onKeyDown(keyCode, keyEvent);
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mSoftKeyboardTool != null) {
+            mSoftKeyboardTool.dismiss();
+        }
+    }
+
     private boolean back() {
         if (bookSourceBean == null) {
             bookSourceBean = new BookSourceBean();
         }
-        if (!getBookSource().equals(bookSourceBean)) {
+        if (!getBookSource(true).equals(bookSourceBean)) {
             new AlertDialog.Builder(this)
                     .setTitle(getString(R.string.exit))
                     .setMessage(getString(R.string.exit_no_save))
@@ -619,7 +651,8 @@ public class SourceEditActivity extends MBaseActivity<SourceEditContract.Present
         return false;
     }
 
-    private void insertTextToEditText(String txt) {
+    @Override
+    public void sendText(@NotNull String txt) {
         if (isEmpty(txt)) return;
         View view = getWindow().getDecorView().findFocus();
         if (view instanceof EditText) {

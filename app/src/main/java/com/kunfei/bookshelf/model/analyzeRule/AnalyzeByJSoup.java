@@ -7,7 +7,9 @@ import com.kunfei.bookshelf.utils.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.TextNode;
+import org.jsoup.select.Collector;
 import org.jsoup.select.Elements;
+import org.jsoup.select.Evaluator;
 import org.seimicrawler.xpath.JXNode;
 
 import java.util.ArrayList;
@@ -58,7 +60,7 @@ public class AnalyzeByJSoup {
         if (textS.size() == 0) {
             return null;
         }
-        return StringUtils.join("\n", textS).trim();
+        return TextUtils.join(",", textS).trim();
     }
 
     /**
@@ -303,7 +305,19 @@ public class AnalyzeByJSoup {
                         }
                         break;
                     case "id":
-                        elements.add(temp.getElementById(rules[1]));
+                        Elements elementsById = Collector.collect(new Evaluator.Id(rules[1]), temp);
+                        if (rules.length == 3) {
+                            int index = Integer.parseInt(rules[2]);
+                            if (index < 0) {
+                                elements.add(elementsById.get(elementsById.size() + index));
+                            } else {
+                                elements.add(elementsById.get(index));
+                            }
+                        } else {
+                            if (needFilterElements)
+                                elementsById = filterElements(elementsById, filterRules);
+                            elements.addAll(elementsById);
+                        }
                         break;
                     case "text":
                         Elements elementsByText = temp.getElementsContainingOwnText(rules[1]);
@@ -363,13 +377,15 @@ public class AnalyzeByJSoup {
      */
     private List<String> getResultLast(Elements elements, String lastRule) {
         List<String> textS = new ArrayList<>();
+        List<String> cText = new ArrayList<>();
         try {
             switch (lastRule) {
                 case "text":
                     for (Element element : elements) {
                         String text = element.text();
-                        textS.add(text);
+                        cText.add(text);
                     }
+                    textS.add(TextUtils.join("\n", cText));
                     break;
                 case "textNodes":
                     for (Element element : elements) {
@@ -377,16 +393,25 @@ public class AnalyzeByJSoup {
                         for (int i = 0; i < contentEs.size(); i++) {
                             String temp = contentEs.get(i).text().trim();
                             if (!isEmpty(temp)) {
-                                textS.add(temp);
+                                cText.add(temp);
                             }
                         }
                     }
+                    textS.add(TextUtils.join("\n", cText));
                     break;
                 case "ownText":
+                    for (Element element : elements) {
+                        cText.add(element.ownText());
+                    }
+                    textS.add(TextUtils.join("\n", cText));
+                    break;
                 case "html":
-                    elements.select("script").remove();
+                    elements.select("script, style").remove();
                     String html = elements.html();
                     textS.add(html);
+                    break;
+                case "all":
+                    textS.add(elements.outerHtml());
                     break;
                 default:
                     for (Element element : elements) {

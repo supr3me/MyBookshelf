@@ -36,13 +36,14 @@ public class ChapterContentHelp {
     /**
      * 替换净化
      */
-    public String replaceContent(String bookName, String bookTag, String content) {
+    public String replaceContent(String bookName, String bookTag, String content, Boolean replaceEnable) {
+        if (!replaceEnable) return toTraditional(content);
         if (ReplaceRuleManager.getEnabled().size() == 0) return toTraditional(content);
         //替换
         for (ReplaceRuleBean replaceRule : ReplaceRuleManager.getEnabled()) {
             if (isUseTo(replaceRule.getUseTo(), bookTag, bookName)) {
                 try {
-                    content = content.replaceAll(replaceRule.getFixedRegex(), replaceRule.getReplacement()).trim();
+                    content = content.replaceAll(replaceRule.getFixedRegex(), replaceRule.getReplacement());
                 } catch (Exception ignored) {
                 }
             }
